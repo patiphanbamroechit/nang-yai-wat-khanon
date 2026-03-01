@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Planning | Nang Yai Wat Khanon</title>
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png">
+    <!-- แก้ไข Favicon ของเว็บไซต์เป็นลิงก์ใหม่ตามที่ระบุ -->
+    <link rel="icon" type="image/png" href="https://img2.pic.in.th/LOGO1204601e6c446e98.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDKs -->
@@ -15,7 +15,7 @@
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration (ใส่ค่าจริงเพื่อให้รันบน GitHub ได้) ---
+        // --- Firebase Configuration (สำหรับรันบน GitHub และ Preview) ---
         const firebaseConfig = {
             apiKey: "AIzaSyDo5SurxNWO9Sw9T2ReiL39bC5dBE8gUn4",
             authDomain: "nang-yai-wat-khanon.firebaseapp.com",
@@ -60,7 +60,7 @@
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            renderApp(); // เรียก Render ทุกครั้งที่สถานะ Auth เปลี่ยน
+            renderApp(); 
         });
 
         window.checkAdminPassword = () => {
@@ -77,7 +77,6 @@
         };
 
         const renderApp = () => {
-            // ซ่อนทุกหน้าก่อน
             viewerPage.classList.add('hidden');
             adminPage.classList.add('hidden');
             adminLoginPage.classList.add('hidden');
@@ -99,7 +98,6 @@
 
         const loadLinks = (isAdmin) => {
             if (!currentUser) return;
-            // ใช้โครงสร้าง Path ตามกฎที่กำหนด
             const linksCol = collection(db, 'artifacts', app_id_path, 'public', 'data', 'links');
             onSnapshot(linksCol, (snapshot) => {
                 links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -349,7 +347,7 @@
                 </div>
             </div>
 
-            <!-- Admin Entry point at the very bottom (เรียบๆ ไม่เด่น) -->
+            <!-- Admin Entry point at the very bottom -->
             <footer class="w-full py-32 mt-20">
                 <a href="#admin" class="text-zinc-900 hover:text-zinc-700 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
             </footer>
