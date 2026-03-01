@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (ปรับปรุงความแม่นยำสูง)
+        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -81,7 +81,7 @@
                 const targetRect = mainLogo.getBoundingClientRect();
                 const splashRect = splashLogo.getBoundingClientRect();
                 
-                // คำนวณระยะการเคลื่อนที่จากกึ่งกลางจอไปตำแหน่งเป้าหมาย
+                // คำนวณระยะการเคลื่อนที่
                 const deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
                 const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
                 const scale = targetRect.width / splashRect.width;
@@ -90,11 +90,10 @@
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    // 2. คำนวณตำแหน่งเส้นขาวจากพิกัดจริงของรูป (39.5%) 
-                    // ยึดตามขอบซ้ายของตัวรูปภาพ (targetRect.left) เพื่อให้ตำแหน่งคงที่ทุกอุปกรณ์
+                    // 2. คำนวณตำแหน่งเส้นขาวจากพิกัดจริงของรูป (39.5%)
                     const lineXPos = targetRect.left + (targetRect.width * 0.395);
 
-                    // ย้าย Overlay ไปจ่อที่เส้นทันทีโดยไม่มีอนิเมชั่น (กันอาการรูดจากกลางจอ)
+                    // ย้าย Overlay ไปจ่อที่เส้นทันทีโดยไม่มีอนิเมชั่น
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineXPos + 'px';
                     transitionOverlay.style.width = '3px';
@@ -433,7 +432,7 @@
             width: 100%;
         }
         
-        /* แสงฟุ้งสีแดง (Red Glow) - ปรับปรุงความสมูทและความอ่อนโยน (Faded & Lighter) */
+        /* แสงฟุ้งสีแดง (Red Glow) - ปรับปรุงให้อ่อนโยนและอยู่ใกล้ขอบบนสุด (Subtle & Tight) */
         body::before {
             content: "";
             position: absolute; 
@@ -442,8 +441,9 @@
             transform: translateX(-50%);
             width: 100vw;
             max-width: 1400px;
-            height: 700px; /* เพิ่มความสูงให้ระยะฟุ้งยาวขึ้น */
-            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.18) 0%, transparent 95%);
+            height: 450px; /* ลดความสูงลงเพื่อให้แสงอยู่แค่ขอบบน */
+            /* ปรับความเข้มให้อ่อนลง (0.12) และขยายระยะจาง (80%) */
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.12) 0%, transparent 80%);
             pointer-events: none; 
             z-index: -1; 
         }
@@ -459,7 +459,7 @@
         }
         input:focus, textarea:focus, select:focus { border-color: #450a0a !important; }
 
-        /* Splash Screen Style - ปรับขนาดโลโก้หดเข้ามาบนมือถือ (max-w-[70vw]) */
+        /* Splash Screen Style */
         #splash-screen { background-color: black; transition: opacity 1.2s ease-in-out; }
         #splash-logo {
             transition: all 1s cubic-bezier(0.65, 0, 0.35, 1);
@@ -487,7 +487,7 @@
         }
 
         #app-content { opacity: 0; transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        #main-logo { opacity: 0; max-width: 80vw; } /* ป้องกันกินขอบบนหน้าหลักด้วย */
+        #main-logo { opacity: 0; max-width: 80vw; }
 
         @keyframes pulseLogo {
             0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(15px); }
