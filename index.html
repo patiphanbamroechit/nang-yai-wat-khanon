@@ -419,28 +419,24 @@
             margin: 0; padding: 0; 
             position: relative; 
             width: 100%;
-            overflow-x: hidden; /* ป้องกันการเลื่อนด้านข้างจากแสงฟุ้ง */
+            overflow-x: hidden;
         }
         
-        /* แก้ไขแสงฟุ้งสีแดง (Red Glow) ให้ไม่โดนบีบในมือถือ */
         body::before {
             content: "";
             position: absolute; 
-            top: -100px; /* ขยับขึ้นไปอีกนิดให้ดูนุ่มนวล */
+            top: -100px;
             left: 50%; 
             transform: translateX(-50%);
-            /* ในมือถือใช้ width ที่กว้างกว่าจอ (160%) เพื่อไม่ให้ขอบวงกลมโดนบีบแคบ */
             width: 160%;
-            max-width: 1400px; /* ขยายให้กว้างขึ้นใน Desktop */
-            height: 600px; /* เพิ่มความสูงให้แสงกระจายลงมาสวยๆ */
-            /* ใช้ circle แทน ellipse และเพิ่มความฟุ้งด้วย filter */
+            max-width: 1400px;
+            height: 600px;
             background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.18) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 75%);
-            filter: blur(40px); /* เพิ่ม Blur ชั้นสูงเพื่อให้แสงดูเป็นบรรยากาศ (Atmospheric) */
+            filter: blur(40px);
             pointer-events: none; 
             z-index: -1; 
         }
 
-        /* ปรับสำหรับหน้าจอ Desktop */
         @media (min-width: 768px) {
             body::before {
                 width: 100%;
@@ -529,10 +525,26 @@
 
         <!-- MAINTENANCE PAGE -->
         <div id="maintenance-page" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-center">
-            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mb-12 opacity-10 grayscale object-contain">
-            <h2 class="text-red-900 text-xl font-bold uppercase tracking-[0.4em] mb-4 text-center">Under Maintenance</h2>
-            <p class="text-zinc-800 text-[9px] max-w-xs mx-auto leading-relaxed text-center uppercase tracking-widest font-light">The digital gallery is currently being curated. <br> Please return later.</p>
-            <footer class="mt-32"><a href="#admin" class="text-[7px] text-zinc-900 uppercase tracking-[0.6em] hover:text-zinc-800">Staff Access</a></footer>
+            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mb-10 opacity-10 grayscale object-contain">
+            
+            <!-- ปรับลด tracking และขยับข้อความเข้าใกล้กัน -->
+            <h2 class="text-red-900 text-xl md:text-2xl font-bold uppercase tracking-widest mb-0.5 text-center">หนังใหญ่ปิดทำการแสดง</h2>
+            <h3 class="text-red-900/60 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-6 text-center">Performance Temporarily Closed</h3>
+            
+            <div class="space-y-2.5 max-w-xs mx-auto">
+                <!-- ปรับฟอนต์ภาษาไทยให้มีสไตล์เดียวกับภาษาอังกฤษ (font-light, tracking-widest) -->
+                <p class="text-zinc-400 text-[11px] md:text-[13px] leading-relaxed font-light tracking-widest text-center">
+                    กำลังปรับปรุงระบบ <br> โปรดกลับมาใหม่อีกครั้งในภายหลัง
+                </p>
+                <div class="w-12 h-px bg-zinc-900 mx-auto my-3"></div>
+                <p class="text-zinc-700 text-[9px] md:text-[10px] uppercase tracking-widest font-light text-center leading-relaxed">
+                    The system is undergoing maintenance. <br> Please return later.
+                </p>
+            </div>
+            
+            <footer class="mt-24">
+                <a href="#admin" class="text-[7px] text-zinc-900 uppercase tracking-widest hover:text-zinc-800 transition-colors">Staff Access / สำหรับเจ้าหน้าที่</a>
+            </footer>
         </div>
     </div>
 
