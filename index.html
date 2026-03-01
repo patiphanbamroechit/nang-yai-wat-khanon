@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (ปรับพิกัด 39.5% จากซ้าย)
+        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (พิกัด 39.5%)
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -74,7 +74,7 @@
             const appContent = document.getElementById('app-content');
             const transitionOverlay = document.getElementById('transition-overlay');
             
-            // ล็อค Scrollbar ไว้ตั้งแต่แรก
+            // ล็อค Scrollbar
             document.body.style.overflow = 'hidden';
 
             setTimeout(() => {
@@ -85,46 +85,42 @@
                 const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
                 const scale = targetRect.width / splashRect.width;
 
-                // 1. เลื่อนโลโก้เข้าหาตำแหน่งเป้าหมาย
+                // 1. เลื่อนรูปเข้าตำแหน่ง
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    // 2. คำนวณตำแหน่งเส้นขาวในรูป (ปรับใหม่เป็น 39.5% จากซ้ายของรูป)
+                    // 2. คำนวณตำแหน่งพิกัดเส้นขาว 39.5%
                     const lineOffsetRatio = 0.395; 
                     const lineOffsetFromCenter = targetRect.width * (lineOffsetRatio - 0.5); 
                     const lineGlobalX = (targetRect.left + targetRect.width / 2) + lineOffsetFromCenter;
 
-                    // เซ็ตตำแหน่ง Overlay ไปจ่อที่เส้นทันทีแบบไม่มีอนิเมชั่น
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineGlobalX + 'px';
-                    transitionOverlay.style.width = '3px';
+                    transitionOverlay.style.width = '4px';
                     transitionOverlay.style.height = '0';
                     
-                    // Force reflow
                     void transitionOverlay.offsetWidth;
 
-                    // เริ่มอนิเมชั่นพุ่งขึ้น-ลง
                     transitionOverlay.style.transition = 'height 0.6s cubic-bezier(0.65, 0, 0.35, 1), width 0.6s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.5s ease, left 0.6s cubic-bezier(0.65, 0, 0.35, 1)';
                     transitionOverlay.style.opacity = "1";
                     transitionOverlay.style.height = "100vh"; 
                     
                     setTimeout(() => {
-                        // 3. ขยายออกข้างจนขาวทั้งจอ และปรับตำแหน่งกลับมากลางจอเพื่อให้ครอบคลุมพื้นที่
+                        // 3. ปาดออกข้าง
                         transitionOverlay.style.width = "100vw";
                         transitionOverlay.style.left = "50%"; 
                         
                         setTimeout(() => {
-                            // 4. หน้าจอขาวสนิท: สลับหน้า Viewer ภายใต้หน้ากากสีขาว
+                            // 4. สลับหน้าจอ
                             appContent.style.opacity = "1";
                             mainLogo.style.opacity = "1";
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
 
-                            // 5. ค่อยๆ จางความขาวออก และเปิดให้เลื่อนได้
+                            // 5. จางออก
                             transitionOverlay.style.opacity = "0";
                             setTimeout(() => {
                                 transitionOverlay.style.display = 'none';
-                                // คืนค่า Scrollbar เมื่อทุกอย่างพร้อม
                                 document.body.style.overflow = 'auto'; 
                             }, 1000);
                         }, 700);
@@ -258,7 +254,7 @@
                                     `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>` : 
                                     `<div class="flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center">
                                         <span class="text-3xl mb-2">🎥</span>
-                                        <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline opacity-50">Watch on YouTube</a>
+                                        <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full">Watch on YouTube</a>
                                     </div>`
                                 }
                             </div>
@@ -275,7 +271,7 @@
                     `;
                 } else {
                     return `
-                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-600/50 p-7 rounded-3xl transition-all duration-500 hover:-translate-y-1 text-left mb-6 shadow-xl overflow-hidden">
+                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-900/50 p-7 rounded-3xl transition-all duration-500 hover:-translate-y-1 text-left mb-6 shadow-xl overflow-hidden">
                             <div class="flex items-center space-x-5">
                                 <div class="w-10 h-10 flex items-center justify-center rounded-2xl bg-zinc-900/50 text-zinc-500 group-hover:text-red-500 transition-colors border border-zinc-800">
                                     <span class="text-xl">🔗</span>
@@ -430,19 +426,24 @@
             font-family: 'SaoChingcha', sans-serif; 
             background-color: #000; 
             color: #fff; 
-            overflow: hidden; /* ล็อค Scrollbar เป็น Default */
             margin: 0; padding: 0; 
             position: relative; 
+            width: 100%;
         }
         
-        /* Fixed Glow at top (คงความเข้มและล็อคตำแหน่ง) */
+        /* แสงฟุ้งสีแดง (Red Glow) - ปรับลดความเข้มลงเล็กน้อย (0.45 -> 0.3) */
         body::before {
             content: "";
-            position: fixed;
-            top: 0; left: 0; right: 0; 
-            height: 420px;
-            background: radial-gradient(ellipse at top, rgba(185, 28, 28, 0.35) 0%, transparent 85%);
-            pointer-events: none; z-index: 0;
+            position: absolute; 
+            top: 0; 
+            left: 50%; 
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 1400px;
+            height: 600px; 
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.3) 0%, transparent 75%);
+            pointer-events: none; 
+            z-index: -1; 
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -465,7 +466,7 @@
             filter: drop-shadow(0 0 30px rgba(153, 27, 27, 0.4));
         }
 
-        /* Transition Overlay - เส้นขาวขยายพุ่งจากแนวเส้นในรูป */
+        /* Transition Overlay - เส้นขาวขยาย */
         #transition-overlay {
             position: fixed;
             top: 50%;
@@ -548,8 +549,8 @@
     <!-- ADMIN DASHBOARD -->
     <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12 relative z-10 text-left">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
-            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1">Exhibition Design & Sequence</p></div>
-            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-900 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
+            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
+            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
         </div>
         <div class="grid lg:grid-cols-5 gap-10 text-left">
             <div class="lg:col-span-2 text-left">
