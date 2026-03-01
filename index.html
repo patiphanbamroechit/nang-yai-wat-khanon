@@ -251,10 +251,11 @@
                     `;
                 } else if (link.type === 'video') {
                     const embedUrl = getEmbedUrl(link.url);
+                    const ratio = link.ratio || '16/9';
                     return `
                         <div class="reveal-item w-full mb-14 text-left" style="animation-delay: ${delay}s">
                             <h3 class="text-white text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative aspect-video rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-4 shadow-2xl">
+                            <div class="relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-4 shadow-2xl" style="aspect-ratio: ${ratio}">
                                 ${embedUrl ? 
                                     `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>` : 
                                     `<div class="flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center">
@@ -360,6 +361,7 @@
             document.getElementById('edit-type').value = link.type;
             document.getElementById('edit-description').value = link.description || '';
             document.getElementById('edit-status').value = link.status || 'show';
+            document.getElementById('edit-ratio').value = link.ratio || '16/9';
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
         };
@@ -377,9 +379,10 @@
             const type = document.getElementById('edit-type').value;
             const description = document.getElementById('edit-description').value;
             const status = document.getElementById('edit-status').value;
+            const ratio = document.getElementById('edit-ratio').value;
             try {
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), {
-                    title, url, type, description, status
+                    title, url, type, description, status, ratio
                 });
                 window.closeEditModal();
             } catch (err) { console.error(err); }
@@ -391,10 +394,11 @@
             const url = document.getElementById('url').value;
             const type = document.getElementById('type').value;
             const description = document.getElementById('description').value;
+            const ratio = document.getElementById('add-ratio').value;
             const createdAt = Date.now();
             try {
                 await addDoc(collection(db, 'artifacts', app_id_path, 'public', 'data', 'links'), {
-                    title, url, type, description, createdAt, order: createdAt, status: 'show'
+                    title, url, type, description, ratio, createdAt, order: createdAt, status: 'show'
                 });
                 addLinkForm.reset();
             } catch (err) { console.error(err); }
@@ -445,7 +449,7 @@
             position: relative;
         }
         
-        /* ปรับรัศมีแสงสีแดงฟุ้งๆ ให้กว้างออกมาอีกนิด (จาก 110% เป็น 130%) */
+        /* แสงฟุ้งสีแดง */
         body::before {
             content: "";
             position: absolute; 
@@ -614,12 +618,21 @@
                         <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
                         <textarea id="description" placeholder="DESCRIPTION (OPTIONAL)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
                         <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
-                        <select id="type" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
-                            <option value="link">🔗 Link Card</option>
-                            <option value="image">🖼️ Static Image</option>
-                            <option value="video">🎥 Motion Video</option>
-                            <option value="text">📝 Narrative Text</option>
-                        </select>
+                        <div class="grid grid-cols-2 gap-4">
+                            <select id="type" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                                <option value="link">🔗 Link Card</option>
+                                <option value="image">🖼️ Static Image</option>
+                                <option value="video">🎥 Motion Video</option>
+                                <option value="text">📝 Narrative Text</option>
+                            </select>
+                            <!-- เพิ่มตัวเลือก Aspect Ratio -->
+                            <select id="add-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                                <option value="16/9">📐 16:9 (Standard)</option>
+                                <option value="1/1">📐 1:1 (Square)</option>
+                                <option value="9/16">📐 9:16 (Vertical)</option>
+                                <option value="4/3">📐 4:3 (Classic)</option>
+                            </select>
+                        </div>
                         <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all hover:bg-red-900 hover:text-white text-center">Add to Sequence</button>
                     </form>
                 </div>
@@ -643,12 +656,21 @@
                 <input type="text" id="edit-title" required class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
                 <textarea id="edit-description" placeholder="Description" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
                 <input type="url" id="edit-url" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
-                <select id="edit-type" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
-                    <option value="link">Link Card</option>
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
-                    <option value="text">Narrative Text</option>
-                </select>
+                <div class="grid grid-cols-2 gap-4">
+                    <select id="edit-type" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                        <option value="link">Link Card</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="text">Narrative Text</option>
+                    </select>
+                    <!-- ตัวเลือก Aspect Ratio ในหน้าแก้ไข -->
+                    <select id="edit-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                        <option value="16/9">16:9 (Standard)</option>
+                        <option value="1/1">1:1 (Square)</option>
+                        <option value="9/16">9:16 (Vertical)</option>
+                        <option value="4/3">4:3 (Classic)</option>
+                    </select>
+                </div>
                 <select id="edit-status" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest mt-2 border-zinc-900">
                     <option value="show">🟢 PUBLIC</option>
                     <option value="hide">🔴 PRIVATE</option>
