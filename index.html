@@ -13,7 +13,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -34,6 +34,7 @@
 
         let currentUser = null;
         let links = [];
+        let siteStatus = 'open'; 
         let isInitialLoad = true; 
         let isAdminAuthorized = sessionStorage.getItem('isAdminAuthorized') === 'true';
         const ADMIN_PASSWORD = "Pluk65030138";
@@ -41,10 +42,12 @@
         const viewerPage = document.getElementById('viewer-page');
         const adminPage = document.getElementById('admin-page');
         const adminLoginPage = document.getElementById('admin-login-page');
+        const maintenancePage = document.getElementById('maintenance-page');
         const linksContainer = document.getElementById('links-container');
         const adminLinksContainer = document.getElementById('admin-links-container');
         const addLinkForm = document.getElementById('add-link-form');
         const editModal = document.getElementById('edit-modal');
+        const siteStatusBtn = document.getElementById('site-status-toggle');
 
         const initAuth = async () => {
             try {
@@ -56,8 +59,44 @@
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
+            loadSiteConfig(); 
             renderApp(); 
         });
+
+        const loadSiteConfig = () => {
+            if (!currentUser) return;
+            const configDoc = doc(db, 'artifacts', app_id_path, 'public', 'data', 'settings', 'site_config');
+            onSnapshot(configDoc, (docSnap) => {
+                if (docSnap.exists()) {
+                    siteStatus = docSnap.data().status || 'open';
+                } else {
+                    setDoc(configDoc, { status: 'open' });
+                }
+                updateStatusUI();
+                renderApp();
+            });
+        };
+
+        const updateStatusUI = () => {
+            if (siteStatus === 'open') {
+                siteStatusBtn.innerHTML = '<span class="text-green-500 font-bold tracking-tight text-[10px]">🟢 ONLINE</span>';
+                siteStatusBtn.classList.remove('bg-red-600/10');
+                siteStatusBtn.classList.add('bg-green-600/10');
+            } else {
+                siteStatusBtn.innerHTML = '<span class="text-red-500 font-bold tracking-tight text-[10px]">🔴 MAINTENANCE</span>';
+                siteStatusBtn.classList.remove('bg-green-600/10');
+                siteStatusBtn.classList.add('bg-red-600/10');
+            }
+        };
+
+        window.toggleSiteStatus = async () => {
+            const newStatus = siteStatus === 'open' ? 'closed' : 'open';
+            try {
+                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'settings', 'site_config'), {
+                    status: newStatus
+                });
+            } catch (err) { console.error(err); }
+        };
 
         window.checkAdminPassword = () => {
             const passInput = document.getElementById('admin-password-input');
@@ -73,9 +112,9 @@
         };
 
         const renderApp = () => {
-            viewerPage.classList.add('hidden');
-            adminPage.classList.add('hidden');
-            adminLoginPage.classList.add('hidden');
+            const pages = [viewerPage, adminPage, adminLoginPage, maintenancePage];
+            pages.forEach(p => p.classList.add('hidden'));
+
             const hash = window.location.hash;
             
             if (hash === '#admin') {
@@ -86,8 +125,12 @@
                     adminLoginPage.classList.remove('hidden');
                 }
             } else {
-                viewerPage.classList.remove('hidden');
-                loadLinks(false);
+                if (siteStatus === 'closed') {
+                    maintenancePage.classList.remove('hidden');
+                } else {
+                    viewerPage.classList.remove('hidden');
+                    loadLinks(false);
+                }
             }
         };
 
@@ -103,11 +146,11 @@
             }, (error) => {
                 console.error("Firestore error:", error);
                 isInitialLoad = false;
-                if (!isAdmin) linksContainer.innerHTML = '<p class="text-red-500 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
             });
         };
 
         const getEmbedUrl = (url) => {
+            if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) return `https://www.youtube.com/embed/${match[2]}`;
@@ -115,7 +158,9 @@
         };
 
         const renderViewerLinks = () => {
-            if (links.length === 0) {
+            const visibleLinks = links.filter(link => link.status !== 'hide');
+
+            if (visibleLinks.length === 0) {
                 if (isInitialLoad) {
                     linksContainer.innerHTML = '<p class="text-zinc-600 py-10 animate-pulse text-[10px]">กำลังโหลดเนื้อหา...</p>';
                 } else {
@@ -124,15 +169,15 @@
                 return;
             }
 
-            linksContainer.innerHTML = links.map(link => {
-                const descHtml = link.description ? `<p class="text-zinc-500 text-[10px] md:text-xs mt-2 leading-relaxed whitespace-pre-wrap">${link.description}</p>` : '';
+            linksContainer.innerHTML = visibleLinks.map(link => {
+                const descHtml = link.description ? `<p class="text-zinc-500 text-[10px] md:text-xs mt-2 leading-relaxed whitespace-pre-wrap text-left">${link.description}</p>` : '';
                 
                 if (link.type === 'image') {
                     return `
                         <div class="w-full mb-12 text-left">
                             <h3 class="text-white text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative overflow-hidden rounded-2xl border border-zinc-800 shadow-xl mt-3">
-                                <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-cover" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
+                            <div class="relative overflow-hidden rounded-2xl border border-zinc-800 shadow-xl mt-3 bg-zinc-900/10">
+                                <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-contain block mx-auto" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
                             </div>
                             ${descHtml}
                         </div>
@@ -145,7 +190,7 @@
                             <div class="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800 bg-black mt-3">
                                 ${embedUrl ? 
                                     `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>` : 
-                                    `<div class="flex flex-col items-center justify-center h-full text-zinc-600 p-4">
+                                    `<div class="flex flex-col items-center justify-center h-full text-zinc-600 p-4 text-center">
                                         <span class="text-4xl mb-2">🎥</span>
                                         <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline">ดูวิดีโอภายนอก</a>
                                     </div>`
@@ -182,26 +227,39 @@
 
         const renderAdminLinks = () => {
             if (links.length === 0 && !isInitialLoad) {
-                adminLinksContainer.innerHTML = '<p class="text-zinc-700 py-10 text-center italic">ยังไม่มีรายการใดๆ</p>';
+                adminLinksContainer.innerHTML = '<p class="text-zinc-700 py-10 text-center italic text-xs">ยังไม่มีรายการใดๆ</p>';
                 return;
             }
-            adminLinksContainer.innerHTML = links.map((link, index) => `
-                <div class="bg-zinc-900 border border-zinc-800 p-4 rounded-xl mb-3 flex items-center justify-between group">
+            adminLinksContainer.innerHTML = links.map((link, index) => {
+                const isHidden = link.status === 'hide';
+                return `
+                <div class="bg-zinc-900 border ${isHidden ? 'border-zinc-800/50 opacity-50' : 'border-zinc-800'} p-4 rounded-xl mb-3 flex items-center justify-between group transition-all">
                     <div class="flex-1 min-w-0 mr-4 text-left">
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-[9px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
                             <h3 class="text-white text-sm font-bold truncate">${link.title}</h3>
+                            ${isHidden ? '<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-500 border border-red-900/50 font-bold uppercase ml-1">HIDDEN</span>' : ''}
                         </div>
                         <p class="text-[10px] text-zinc-600 truncate">${link.description || link.url || '-'}</p>
                     </div>
                     <div class="flex items-center gap-1">
+                        <button onclick="window.toggleStatus('${link.id}', '${link.status || 'show'}')" class="p-2 ${isHidden ? 'bg-zinc-800 text-zinc-500' : 'bg-green-600/10 text-green-500'} rounded-lg hover:bg-zinc-700 transition-colors">
+                            ${isHidden ? '👁️‍🗨️' : '👁️'}
+                        </button>
                         <button onclick="window.moveItem(${index}, -1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors" ${index === 0 ? 'disabled opacity-20' : ''}>▲</button>
                         <button onclick="window.moveItem(${index}, 1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors" ${index === links.length - 1 ? 'disabled opacity-20' : ''}>▼</button>
-                        <button onclick="window.openEditModal('${link.id}')" class="px-3 py-2 bg-blue-600/10 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-bold">EDIT</button>
-                        <button onclick="window.deleteLink('${link.id}')" class="px-3 py-2 bg-red-600/10 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[10px] font-bold ml-1">DEL</button>
+                        <button onclick="window.openEditModal('${link.id}')" class="px-3 py-2 bg-blue-600/10 text-blue-500 rounded-lg text-[10px] font-bold">EDIT</button>
+                        <button onclick="window.deleteLink('${link.id}')" class="px-3 py-2 bg-red-600/10 text-red-500 rounded-lg text-[10px] font-bold ml-1">DEL</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
+        };
+
+        window.toggleStatus = async (id, currentStatus) => {
+            const newStatus = currentStatus === 'hide' ? 'show' : 'hide';
+            try {
+                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), { status: newStatus });
+            } catch (err) { console.error(err); }
         };
 
         window.moveItem = async (index, direction) => {
@@ -223,6 +281,7 @@
             document.getElementById('edit-url').value = link.url || '';
             document.getElementById('edit-type').value = link.type;
             document.getElementById('edit-description').value = link.description || '';
+            document.getElementById('edit-status').value = link.status || 'show';
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
         };
@@ -239,9 +298,10 @@
             const url = document.getElementById('edit-url').value;
             const type = document.getElementById('edit-type').value;
             const description = document.getElementById('edit-description').value;
+            const status = document.getElementById('edit-status').value;
             try {
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), {
-                    title, url, type, description
+                    title, url, type, description, status
                 });
                 window.closeEditModal();
             } catch (err) { console.error(err); }
@@ -256,7 +316,7 @@
             const createdAt = Date.now();
             try {
                 await addDoc(collection(db, 'artifacts', app_id_path, 'public', 'data', 'links'), {
-                    title, url, type, description, createdAt, order: createdAt
+                    title, url, type, description, createdAt, order: createdAt, status: 'show'
                 });
                 addLinkForm.reset();
             } catch (err) { console.error(err); }
@@ -332,42 +392,43 @@
     <!-- VIEWER PAGE -->
     <div id="viewer-page" class="min-h-screen flex flex-col items-center justify-start p-6 transition-all relative">
         <div class="max-w-4xl w-full flex flex-col items-center text-center mt-12 md:mt-24">
-            
-            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="h-24 md:h-36 w-auto object-contain mb-10 transition-all">
-            
+            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-24 md:max-h-36 w-auto object-contain mb-10 transition-all">
             <div class="w-full max-w-[580px] px-4">
-                <img src="https://img2.pic.in.th/Asset-110xe5b202fc57a60b74.png" alt="Project Title" class="w-full h-auto object-contain">
+                <img src="https://img2.pic.in.th/Asset-110xe5b202fc57a60b74.png" alt="Project Title" class="w-full h-auto object-contain block mx-auto">
             </div>
-
             <div class="w-full flex justify-center mt-5 mb-12">
                 <div class="w-[80px] h-[3px] bg-red-600 rounded-full opacity-60 shadow-[0_0_15px_rgba(220,38,38,0.3)]"></div>
             </div>
-
-            <!-- ลด pb-40 เหลือ pb-4 เพื่อลดที่ว่างด้านล่างของเนื้อหา -->
             <div id="links-container" class="space-y-12 max-w-[500px] w-full mx-auto pb-4">
-                <div class="animate-pulse space-y-10">
-                    <div class="h-48 bg-zinc-900 rounded-2xl border border-zinc-800 opacity-20"></div>
-                </div>
+                <div class="animate-pulse space-y-10"><div class="h-48 bg-zinc-900 rounded-2xl opacity-20"></div></div>
             </div>
-
-            <!-- ลด py-32 เหลือ py-10 เพื่อให้ปุ่มแอดมินอยู่ใกล้ข้อมูลมากขึ้น -->
             <footer class="w-full py-10">
                 <a href="#admin" class="text-zinc-900 hover:text-zinc-700 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
             </footer>
         </div>
     </div>
 
+    <!-- MAINTENANCE PAGE (ปรับพื้นหลังให้มืดสนิท ไม่ย้อมสี) -->
+    <div id="maintenance-page" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-center">
+        <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-24 md:max-h-32 mb-10 opacity-30 object-contain w-auto">
+        <h2 class="text-red-600 text-xl md:text-2xl font-bold uppercase tracking-[0.3em] mb-4 text-center">Under Maintenance</h2>
+        <p class="text-zinc-500 text-[11px] md:text-sm max-w-xs mx-auto leading-relaxed text-center uppercase tracking-widest">
+            ขออภัย เว็บไซต์กำลังปิดปรับปรุงระบบชั่วคราว <br> กรุณากลับมาใหม่อีกครั้งในภายหลัง
+        </p>
+        <div class="w-12 h-[1px] bg-zinc-900 mt-10 mx-auto"></div>
+        <footer class="mt-20">
+             <a href="#admin" class="text-[8px] text-zinc-900 uppercase tracking-[0.5em] hover:text-zinc-700 transition-colors">Admin Access</a>
+        </footer>
+    </div>
+
     <!-- ADMIN LOGIN -->
-    <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/95 backdrop-blur-2xl z-50">
+    <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/95 z-50">
         <div class="max-w-sm w-full bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] text-center shadow-2xl">
-            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="h-16 mx-auto mb-8 object-contain opacity-80">
-            <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600 border-t border-zinc-800 pt-8">Admin Key</h2>
-            <input type="password" id="admin-password-input" placeholder="Password" 
-                class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl tracking-widest"
-                onkeypress="if(event.key === 'Enter') window.checkAdminPassword()">
-            <p id="login-error" class="text-red-500 text-[10px] mb-4 hidden uppercase tracking-widest">Wrong Password</p>
-            <button onclick="window.checkAdminPassword()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all uppercase tracking-widest text-xs">Login</button>
-            <a href="#" class="inline-block mt-8 text-zinc-600 hover:text-white text-[10px] uppercase tracking-widest transition-colors">← Exit</a>
+            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mx-auto mb-8 object-contain opacity-80 block">
+            <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600 border-t border-zinc-800 pt-8 text-center">Admin Key</h2>
+            <input type="password" id="admin-password-input" placeholder="Password" class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl tracking-widest">
+            <button onclick="window.checkAdminPassword()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Login</button>
+            <a href="#" class="inline-block mt-8 text-zinc-600 hover:text-white text-[10px] uppercase tracking-widest">← Exit</a>
         </div>
     </div>
 
@@ -378,30 +439,33 @@
                 <h1 class="text-2xl font-bold text-red-600 tracking-tighter uppercase">Exhibit Control</h1>
                 <p class="text-zinc-500 text-[9px] uppercase tracking-widest mt-1">Manage content and ordering</p>
             </div>
-            <button onclick="window.logoutAdmin()" class="bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest transition-all">Sign Out</button>
+            <div class="flex items-center gap-4">
+                <button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button>
+                <button onclick="window.logoutAdmin()" class="bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest">Sign Out</button>
+            </div>
         </div>
 
         <div class="grid lg:grid-cols-5 gap-10">
-            <div class="lg:col-span-2">
-                <div class="bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 sticky top-10 shadow-lg text-left">
-                    <h2 class="text-sm font-bold mb-8 flex items-center uppercase tracking-widest text-zinc-400">
+            <div class="lg:col-span-2 text-left">
+                <div class="bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 sticky top-10 shadow-lg">
+                    <h2 class="text-sm font-bold mb-8 flex items-center uppercase tracking-widest text-zinc-400 text-left">
                         <span class="w-1 h-4 bg-red-600 mr-3"></span> New exhibit
                     </h2>
                     <form id="add-link-form" class="space-y-4">
-                        <input type="text" id="title" required placeholder="ชื่อหัวข้อ (เช่น ชื่อตอน, ชื่อประกาศ)" class="w-full rounded-xl p-4 outline-none text-xs">
+                        <input type="text" id="title" required placeholder="ชื่อหัวข้อ" class="w-full rounded-xl p-4 outline-none text-xs">
                         <textarea id="description" placeholder="คำอธิบาย (ถ้ามี)" class="w-full rounded-xl p-4 outline-none text-xs min-h-[100px]"></textarea>
-                        <input type="url" id="url" placeholder="Source URL (ไม่จำเป็นสำหรับข้อความอย่างเดียว)" class="w-full rounded-xl p-4 outline-none text-xs">
+                        <input type="url" id="url" placeholder="Source URL" class="w-full rounded-xl p-4 outline-none text-xs">
                         <select id="type" class="w-full rounded-xl p-4 outline-none appearance-none text-xs">
                             <option value="link">🔗 ลิงก์ทั่วไป (ปุ่มกด)</option>
                             <option value="image">🖼️ รูปภาพ (แสดงทันที)</option>
                             <option value="video">🎥 วิดีโอ (YouTube)</option>
                             <option value="text">📝 ข้อความอย่างเดียว</option>
                         </select>
-                        <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all text-xs uppercase tracking-widest">Publish</button>
+                        <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Publish</button>
                     </form>
                 </div>
             </div>
-            <div class="lg:col-span-3">
+            <div class="lg:col-span-3 text-left">
                 <div class="bg-zinc-900/20 p-8 rounded-[3rem] border border-zinc-800">
                     <h2 class="text-sm font-bold mb-10 uppercase tracking-widest text-zinc-400 text-left">Live Sequence</h2>
                     <div id="admin-links-container" class="space-y-2 custom-scrollbar"></div>
@@ -411,10 +475,10 @@
     </div>
 
     <!-- Edit Modal -->
-    <div id="edit-modal" class="hidden fixed inset-0 z-[200] items-center justify-center bg-black/95 backdrop-blur-xl p-4">
+    <div id="edit-modal" class="hidden fixed inset-0 z-[200] items-center justify-center bg-black/95 p-4">
         <div class="bg-zinc-900 border border-zinc-800 p-10 rounded-[3.5rem] max-w-lg w-full shadow-2xl text-left">
             <h3 class="text-lg font-bold mb-8 uppercase tracking-widest text-white text-center">Update Details</h3>
-            <form id="edit-form" class="space-y-4">
+            <form id="edit-form" class="space-y-4 text-left">
                 <input type="hidden" id="edit-id">
                 <input type="text" id="edit-title" required class="w-full rounded-xl p-4 outline-none text-xs">
                 <textarea id="edit-description" placeholder="คำอธิบาย" class="w-full rounded-xl p-4 outline-none text-xs min-h-[100px]"></textarea>
@@ -425,22 +489,26 @@
                     <option value="video">🎥 Video</option>
                     <option value="text">📝 Text Only</option>
                 </select>
-                <div class="grid grid-cols-2 gap-4">
-                    <button type="submit" class="bg-blue-600 text-white py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-blue-700">Save</button>
-                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-zinc-700">Cancel</button>
+                <select id="edit-status" class="w-full rounded-xl p-4 outline-none appearance-none text-xs mt-2 border-zinc-700">
+                    <option value="show">🟢 แสดงผลบนเว็บ</option>
+                    <option value="hide">🔴 ซ่อนจากหน้าเว็บ</option>
+                </select>
+                <div class="grid grid-cols-2 gap-4 mt-4 text-center">
+                    <button type="submit" class="bg-blue-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px]">Save</button>
+                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px]">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Confirm Delete Modal -->
-    <div id="custom-confirm" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-        <div class="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] max-w-sm w-full text-center shadow-2xl">
+    <div id="custom-confirm" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
+        <div class="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] max-w-sm w-full text-center">
             <h3 class="text-lg font-bold mb-4 uppercase tracking-widest text-red-600">Delete Exhibit?</h3>
-            <p class="text-zinc-500 text-[10px] mb-12 uppercase tracking-widest font-light">This cannot be undone.</p>
+            <p class="text-zinc-500 text-[10px] mb-12 uppercase font-light text-center">ข้อมูลจะถูกลบถาวร</p>
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="window.confirmDeleteAction()" class="bg-red-600 py-3 rounded-2xl font-bold text-[10px] uppercase transition-all hover:bg-red-700">Delete</button>
-                <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-800 py-3 rounded-2xl font-bold text-[10px] text-zinc-500 uppercase transition-all hover:bg-zinc-700">Back</button>
+                <button onclick="window.confirmDeleteAction()" class="bg-red-600 py-3 rounded-2xl font-bold uppercase tracking-widest text-[10px]">Delete</button>
+                <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-800 py-3 rounded-2xl font-bold uppercase tracking-widest text-[10px] text-zinc-500">Back</button>
             </div>
         </div>
     </div>
