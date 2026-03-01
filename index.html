@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Planning | Nang Yai Wat Khanon</title>
-    <!-- เพิ่ม Favicon ของเว็บไซต์ -->
+    <!-- Favicon -->
     <link rel="icon" type="image/png" href="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,12 +12,22 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
-        import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration (ดึงจากตัวแปรระบบเพื่อให้ preview ใช้งานได้)
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // --- Firebase Configuration (ใส่ค่าจริงเพื่อให้รันบน GitHub ได้) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDo5SurxNWO9Sw9T2ReiL39bC5dBE8gUn4",
+            authDomain: "nang-yai-wat-khanon.firebaseapp.com",
+            projectId: "nang-yai-wat-khanon",
+            storageBucket: "nang-yai-wat-khanon.firebasestorage.app",
+            messagingSenderId: "1086671348220",
+            appId: "1:1086671348220:web:a693ade119139eb4ee9279",
+            measurementId: "G-N8CVF98TZX"
+        };
+
+        // กำหนด ID สำหรับโครงสร้างข้อมูลใน Firestore
+        const app_id_path = "nang-yai-wat-khanon-project";
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
@@ -39,13 +49,10 @@
         const addLinkForm = document.getElementById('add-link-form');
         const editModal = document.getElementById('edit-modal');
 
+        // ฟังก์ชันล๊อกอินอัตโนมัติ (Anonymous)
         const initAuth = async () => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
             } catch (error) {
                 console.error("Auth error:", error);
             }
@@ -53,7 +60,7 @@
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            if (user) renderApp();
+            renderApp(); // เรียก Render ทุกครั้งที่สถานะ Auth เปลี่ยน
         });
 
         window.checkAdminPassword = () => {
@@ -70,13 +77,13 @@
         };
 
         const renderApp = () => {
-            if (!currentUser) return;
-            const hash = window.location.hash;
-            
+            // ซ่อนทุกหน้าก่อน
             viewerPage.classList.add('hidden');
             adminPage.classList.add('hidden');
             adminLoginPage.classList.add('hidden');
 
+            const hash = window.location.hash;
+            
             if (hash === '#admin') {
                 if (isAdminAuthorized) {
                     adminPage.classList.remove('hidden');
@@ -92,7 +99,8 @@
 
         const loadLinks = (isAdmin) => {
             if (!currentUser) return;
-            const linksCol = collection(db, 'artifacts', appId, 'public', 'data', 'links');
+            // ใช้โครงสร้าง Path ตามกฎที่กำหนด
+            const linksCol = collection(db, 'artifacts', app_id_path, 'public', 'data', 'links');
             onSnapshot(linksCol, (snapshot) => {
                 links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 links.sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
@@ -132,9 +140,9 @@
             linksContainer.innerHTML = links.map(link => {
                 if (link.type === 'image') {
                     return `
-                        <div class="w-full mb-10 group">
+                        <div class="w-full mb-10">
                             <h3 class="text-white text-[11px] mb-3 font-medium opacity-80 text-left uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative overflow-hidden rounded-2xl border border-zinc-800 shadow-xl shadow-red-900/5 group-hover:border-red-600/50 transition-all">
+                            <div class="relative overflow-hidden rounded-2xl border border-zinc-800 shadow-xl">
                                 <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-cover" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
                             </div>
                         </div>
@@ -142,9 +150,9 @@
                 } else if (link.type === 'video') {
                     const embedUrl = getEmbedUrl(link.url);
                     return `
-                        <div class="w-full mb-10 group">
+                        <div class="w-full mb-10">
                             <h3 class="text-white text-[11px] mb-3 font-medium opacity-80 text-left uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800 shadow-xl shadow-red-900/5 group-hover:border-red-600/50 transition-all bg-black">
+                            <div class="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800 bg-black">
                                 ${embedUrl ? 
                                     `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` : 
                                     `<div class="flex flex-col items-center justify-center h-full text-zinc-600 text-center p-4">
@@ -157,7 +165,7 @@
                     `;
                 } else {
                     return `
-                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/40 border border-zinc-800 hover:border-red-600/50 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden backdrop-blur-md text-left mb-6 shadow-lg shadow-black/20">
+                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/40 border border-zinc-800 hover:border-red-600/50 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden backdrop-blur-md text-left mb-6 shadow-lg">
                             <div class="flex items-center space-x-4 relative z-10">
                                 <div class="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800/50 text-zinc-400 group-hover:text-red-500 group-hover:bg-red-500/10 transition-colors">
                                     <span class="text-lg">🔗</span>
@@ -209,8 +217,8 @@
             const orderB = itemB.order ?? itemB.createdAt ?? 0;
 
             try {
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'links', itemA.id), { order: orderB });
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'links', itemB.id), { order: orderA });
+                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', itemA.id), { order: orderB });
+                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', itemB.id), { order: orderA });
             } catch (err) { console.error("Swap error:", err); }
         };
 
@@ -238,7 +246,7 @@
             const type = document.getElementById('edit-type').value;
 
             try {
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'links', id), {
+                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), {
                     title, url, type
                 });
                 window.closeEditModal();
@@ -252,7 +260,7 @@
             const type = document.getElementById('type').value;
             const createdAt = Date.now();
             try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'links'), {
+                await addDoc(collection(db, 'artifacts', app_id_path, 'public', 'data', 'links'), {
                     title, url, type, createdAt, order: createdAt
                 });
                 addLinkForm.reset();
@@ -266,7 +274,7 @@
 
         window.confirmDeleteAction = async () => {
             if (!currentUser) return;
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'links', window.currentDeleteId));
+            await deleteDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', window.currentDeleteId));
             document.getElementById('custom-confirm').classList.add('hidden');
         };
 
@@ -343,7 +351,7 @@
 
             <!-- Admin Entry point at the very bottom (เรียบๆ ไม่เด่น) -->
             <footer class="w-full py-32 mt-20">
-                <a href="#admin" class="text-zinc-800 hover:text-zinc-500 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
+                <a href="#admin" class="text-zinc-900 hover:text-zinc-700 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
             </footer>
         </div>
     </div>
@@ -351,9 +359,7 @@
     <!-- ADMIN LOGIN -->
     <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/95 backdrop-blur-2xl z-50">
         <div class="max-w-sm w-full bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] text-center shadow-2xl">
-            <!-- เพิ่มรูปภาพโลโก้ในหน้า Login -->
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="h-16 mx-auto mb-8 object-contain opacity-80">
-            
             <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600 border-t border-zinc-800 pt-8">Admin Key</h2>
             <input type="password" id="admin-password-input" placeholder="Password" 
                 class="w-full bg-black border border-zinc-800 rounded-2xl p-4 mb-4 outline-none focus:border-red-600 text-center text-xl tracking-widest font-sans text-white"
