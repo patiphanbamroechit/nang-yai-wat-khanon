@@ -4,18 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Planning | Nang Yai Wat Khanon</title>
+    <!-- เพิ่ม Favicon ของเว็บไซต์ -->
+    <link rel="icon" type="image/png" href="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration
+        // Firebase Configuration (ดึงจากตัวแปรระบบเพื่อให้ preview ใช้งานได้)
         const firebaseConfig = JSON.parse(__firebase_config);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
@@ -99,7 +105,7 @@
                 console.error("Firestore error:", error);
                 isInitialLoad = false;
                 if (!isAdmin) {
-                    linksContainer.innerHTML = '<p class="text-red-500 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+                    linksContainer.innerHTML = '<p class="text-red-500 py-10 text-[10px]">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
                 }
             });
         };
@@ -116,9 +122,8 @@
         const renderViewerLinks = () => {
             if (links.length === 0) {
                 if (isInitialLoad) {
-                    linksContainer.innerHTML = '<p class="text-zinc-600 py-10 animate-pulse">กำลังโหลดเนื้อหา...</p>';
+                    linksContainer.innerHTML = '<p class="text-zinc-600 py-10 animate-pulse text-[10px]">กำลังโหลดเนื้อหา...</p>';
                 } else {
-                    // ปรับให้สว่างขึ้น (zinc-500) และเห็นชัดขึ้น
                     linksContainer.innerHTML = '<p class="text-zinc-500 py-20 text-[11px] uppercase tracking-[0.2em]">ยังไม่มีข้อมูลแสดงในขณะนี้</p>';
                 }
                 return;
@@ -152,7 +157,7 @@
                     `;
                 } else {
                     return `
-                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/30 border border-zinc-800 hover:border-red-600/50 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden backdrop-blur-md text-left mb-6 shadow-lg shadow-black/20">
+                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/40 border border-zinc-800 hover:border-red-600/50 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden backdrop-blur-md text-left mb-6 shadow-lg shadow-black/20">
                             <div class="flex items-center space-x-4 relative z-10">
                                 <div class="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800/50 text-zinc-400 group-hover:text-red-500 group-hover:bg-red-500/10 transition-colors">
                                     <span class="text-lg">🔗</span>
@@ -176,7 +181,7 @@
             }
             adminLinksContainer.innerHTML = links.map((link, index) => `
                 <div class="bg-zinc-900 border border-zinc-800 p-4 rounded-xl mb-3 flex items-center justify-between group">
-                    <div class="flex-1 min-w-0 mr-4">
+                    <div class="flex-1 min-w-0 mr-4 text-left">
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-[9px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
                             <h3 class="text-white text-sm font-bold truncate">${link.title}</h3>
@@ -338,7 +343,7 @@
 
             <!-- Admin Entry point at the very bottom (เรียบๆ ไม่เด่น) -->
             <footer class="w-full py-32 mt-20">
-                <a href="#admin" class="text-zinc-800 hover:text-zinc-500 text-[9px] tracking-[0.5em] uppercase transition-colors font-light">Administrator</a>
+                <a href="#admin" class="text-zinc-800 hover:text-zinc-500 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
             </footer>
         </div>
     </div>
@@ -346,7 +351,10 @@
     <!-- ADMIN LOGIN -->
     <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/95 backdrop-blur-2xl z-50">
         <div class="max-w-sm w-full bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] text-center shadow-2xl">
-            <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600">Admin Key</h2>
+            <!-- เพิ่มรูปภาพโลโก้ในหน้า Login -->
+            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="h-16 mx-auto mb-8 object-contain opacity-80">
+            
+            <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600 border-t border-zinc-800 pt-8">Admin Key</h2>
             <input type="password" id="admin-password-input" placeholder="Password" 
                 class="w-full bg-black border border-zinc-800 rounded-2xl p-4 mb-4 outline-none focus:border-red-600 text-center text-xl tracking-widest font-sans text-white"
                 onkeypress="if(event.key === 'Enter') window.checkAdminPassword()">
@@ -360,7 +368,7 @@
 
     <!-- ADMIN DASHBOARD -->
     <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-800 pb-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-800 pb-8 text-left">
             <div>
                 <h1 class="text-2xl font-bold text-red-600 tracking-tighter uppercase">Exhibit Control</h1>
                 <p class="text-zinc-500 text-[9px] uppercase tracking-widest mt-1">Manage content and ordering</p>
@@ -370,7 +378,7 @@
 
         <div class="grid lg:grid-cols-5 gap-10">
             <div class="lg:col-span-2">
-                <div class="bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 sticky top-10 shadow-lg">
+                <div class="bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 sticky top-10 shadow-lg text-left">
                     <h2 class="text-sm font-bold mb-8 flex items-center uppercase tracking-widest text-zinc-400">
                         <span class="w-1 h-4 bg-red-600 mr-3"></span> New exhibit
                     </h2>
@@ -382,13 +390,13 @@
                             <option value="image">🖼️ Visual Image</option>
                             <option value="video">🎥 YouTube Video</option>
                         </select>
-                        <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all text-xs uppercase tracking-widest shadow-xl shadow-red-900/20">Publish</button>
+                        <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all text-xs uppercase tracking-widest">Publish</button>
                     </form>
                 </div>
             </div>
             <div class="lg:col-span-3">
                 <div class="bg-zinc-900/20 p-8 rounded-[3rem] border border-zinc-800">
-                    <h2 class="text-sm font-bold mb-10 uppercase tracking-widest text-zinc-400">Live Sequence</h2>
+                    <h2 class="text-sm font-bold mb-10 uppercase tracking-widest text-zinc-400 text-left">Live Sequence</h2>
                     <div id="admin-links-container" class="space-y-2 custom-scrollbar"></div>
                 </div>
             </div>
@@ -397,8 +405,8 @@
 
     <!-- Edit Modal -->
     <div id="edit-modal" class="hidden fixed inset-0 z-[200] items-center justify-center bg-black/95 backdrop-blur-xl p-4">
-        <div class="bg-zinc-900 border border-zinc-800 p-10 rounded-[3.5rem] max-w-lg w-full shadow-2xl">
-            <h3 class="text-lg font-bold mb-8 uppercase tracking-widest text-white">Update Details</h3>
+        <div class="bg-zinc-900 border border-zinc-800 p-10 rounded-[3.5rem] max-w-lg w-full shadow-2xl text-left">
+            <h3 class="text-lg font-bold mb-8 uppercase tracking-widest text-white text-center">Update Details</h3>
             <form id="edit-form" class="space-y-6">
                 <input type="hidden" id="edit-id">
                 <input type="text" id="edit-title" required class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-blue-600 text-xs text-white">
