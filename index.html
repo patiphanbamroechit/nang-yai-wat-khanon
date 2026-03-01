@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic
+        // Cinematic Transition Logic - ล็อก Scrollbar จนกว่าจะเสร็จสิ้น
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -74,6 +74,8 @@
             const appContent = document.getElementById('app-content');
             const transitionOverlay = document.getElementById('transition-overlay');
             
+            // ล็อกหน้าจอไว้ตั้งแต่เริ่มโหลด
+            document.documentElement.style.overflow = 'hidden';
             document.body.style.overflow = 'hidden';
 
             setTimeout(() => {
@@ -108,11 +110,14 @@
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
                             transitionOverlay.style.opacity = "0";
+                            
+                            // คืนค่าการเลื่อนหน้าจอเฉพาะแนวตั้ง เมื่อกระบวนการทุกอย่างจบลง
                             setTimeout(() => {
                                 transitionOverlay.style.display = 'none';
-                                document.body.style.overflow = 'auto'; 
-                                document.body.style.overflowX = 'hidden';
+                                document.documentElement.style.overflowY = 'auto';
                                 document.documentElement.style.overflowX = 'hidden';
+                                document.body.style.overflowY = 'auto'; 
+                                document.body.style.overflowX = 'hidden';
                             }, 1200);
                         }, 800);
                     }, 600);
@@ -414,14 +419,14 @@
         @font-face { font-family: 'SaoChingcha'; src: url('SaoChingcha-Regular.otf') format('opentype'); font-weight: 400; }
         @font-face { font-family: 'SaoChingcha'; src: url('SaoChingcha-Bold.otf') format('opentype'); font-weight: 700; }
 
-        /* ป้องกันการเลื่อนขวาในระดับ HTML และ BODY */
+        /* ล็อก Scrollbar เริ่มต้น */
         html, body {
-            overflow-x: hidden;
+            overflow: hidden;
             width: 100%;
+            height: 100%;
             position: relative;
             margin: 0;
             padding: 0;
-            /* เพิ่มเพื่อให้มั่นใจว่า Layout ไม่กว้างเกินจอ */
             max-width: 100vw;
         }
 
@@ -431,7 +436,6 @@
             color: #fff; 
         }
         
-        /* แสงฟุ้งสีแดง */
         body::before {
             content: "";
             position: absolute; 
@@ -486,7 +490,7 @@
             transform: translate(-50%, -50%);
             z-index: 10005;
             opacity: 0;
-            transition: height 0.6s cubic-bezier(0.65, 0, 0.35, 1), width 0.6s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.5s ease, left 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+            transition: height 0.8s cubic-bezier(0.65, 0, 0.35, 1), width 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease, left 0.8s cubic-bezier(0.65, 0, 0.35, 1);
             pointer-events: none;
             box-shadow: 0 0 40px rgba(255,255,255,0.6);
         }
