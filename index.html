@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ
+        // Cinematic Transition Logic
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -74,7 +74,6 @@
             const appContent = document.getElementById('app-content');
             const transitionOverlay = document.getElementById('transition-overlay');
             
-            // ล็อค Scrollbar ไว้ตั้งแต่แรก
             document.body.style.overflow = 'hidden';
 
             setTimeout(() => {
@@ -85,43 +84,34 @@
                 const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
                 const scale = targetRect.width / splashRect.width;
 
-                // 1. เลื่อนโลโก้เข้าหาตำแหน่งเป้าหมาย
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    // 2. คำนวณตำแหน่งเส้นขาวจากพิกัดจริงของรูป (39.5%)
                     const lineXPos = targetRect.left + (targetRect.width * 0.395);
-
-                    // ย้าย Overlay ไปจ่อที่เส้นทันทีโดยไม่มีอนิเมชั่น
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineXPos + 'px';
                     transitionOverlay.style.width = '3px';
                     transitionOverlay.style.height = '0';
-                    
-                    void transitionOverlay.offsetWidth; // Force Reflow
+                    void transitionOverlay.offsetWidth;
 
-                    // เริ่มอนิเมชั่นขยายแนวตั้ง
                     transitionOverlay.style.transition = 'height 0.6s cubic-bezier(0.65, 0, 0.35, 1), width 0.6s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.5s ease, left 0.6s cubic-bezier(0.65, 0, 0.35, 1)';
                     transitionOverlay.style.opacity = "1";
                     transitionOverlay.style.height = "100vh"; 
                     
                     setTimeout(() => {
-                        // 3. ขยายออกข้างจนขาวทั้งจอ
                         transitionOverlay.style.width = "100vw";
-                        transitionOverlay.style.left = "50%"; // เลื่อนกลับมากลางเพื่อให้ปาดเต็มจอสมดุล
+                        transitionOverlay.style.left = "50%"; 
                         
                         setTimeout(() => {
-                            // 4. สลับหน้าจอภายใต้หน้ากากสีขาว
                             appContent.style.opacity = "1";
                             mainLogo.style.opacity = "1";
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
-
-                            // 5. จางความขาวออก
                             transitionOverlay.style.opacity = "0";
                             setTimeout(() => {
                                 transitionOverlay.style.display = 'none';
-                                document.body.style.overflow = 'auto'; // คืนค่า Scrollbar เมื่อเสร็จสิ้น
+                                document.body.style.overflow = 'auto'; 
+                                document.body.style.overflowX = 'hidden';
                             }, 1000);
                         }, 700);
                     }, 500);
@@ -429,22 +419,34 @@
             margin: 0; padding: 0; 
             position: relative; 
             width: 100%;
+            overflow-x: hidden; /* ป้องกันการเลื่อนด้านข้างจากแสงฟุ้ง */
         }
         
-        /* แสงฟุ้งสีแดง (Red Glow) - ปรับรัศมีแคบลงแต่อ่อนโยนและสว่างขึ้นเล็กน้อย */
+        /* แก้ไขแสงฟุ้งสีแดง (Red Glow) ให้ไม่โดนบีบในมือถือ */
         body::before {
             content: "";
             position: absolute; 
-            top: 0; 
+            top: -100px; /* ขยับขึ้นไปอีกนิดให้ดูนุ่มนวล */
             left: 50%; 
             transform: translateX(-50%);
-            width: 100vw;
-            max-width: 1000px; /* ลดความกว้างสูงสุดให้รัศมีแคบลง */
-            height: 380px; /* ลดความสูงให้แสงอยู่แค่ขอบบน */
-            /* ปรับความสว่างเป็น 0.22 (สว่างขึ้นนิดเดียว) และ Gradient Stop 70% เพื่อความสมูท */
-            background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.22) 0%, rgba(220, 38, 38, 0.1) 40%, transparent 70%);
+            /* ในมือถือใช้ width ที่กว้างกว่าจอ (160%) เพื่อไม่ให้ขอบวงกลมโดนบีบแคบ */
+            width: 160%;
+            max-width: 1400px; /* ขยายให้กว้างขึ้นใน Desktop */
+            height: 600px; /* เพิ่มความสูงให้แสงกระจายลงมาสวยๆ */
+            /* ใช้ circle แทน ellipse และเพิ่มความฟุ้งด้วย filter */
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.18) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 75%);
+            filter: blur(40px); /* เพิ่ม Blur ชั้นสูงเพื่อให้แสงดูเป็นบรรยากาศ (Atmospheric) */
             pointer-events: none; 
             z-index: -1; 
+        }
+
+        /* ปรับสำหรับหน้าจอ Desktop */
+        @media (min-width: 768px) {
+            body::before {
+                width: 100%;
+                height: 500px;
+                background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.08) 50%, transparent 80%);
+            }
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -458,18 +460,16 @@
         }
         input:focus, textarea:focus, select:focus { border-color: #450a0a !important; }
 
-        /* Splash Screen Style */
         #splash-screen { background-color: black; transition: opacity 1.2s ease-in-out; }
         #splash-logo {
             transition: all 1s cubic-bezier(0.65, 0, 0.35, 1);
             position: fixed; z-index: 10001;
             transform: translate(-50%, -50%) scale(1.1);
-            max-width: 60vw; /* หดเข้ามาไม่ให้ชิดขอบจอโทรศัพท์ */
+            max-width: 60vw;
             height: auto;
             filter: drop-shadow(0 0 30px rgba(153, 27, 27, 0.4));
         }
 
-        /* Transition Overlay - เส้นขาวขยาย */
         #transition-overlay {
             position: fixed;
             top: 50%;
@@ -497,7 +497,7 @@
 </head>
 <body class="min-h-screen bg-black custom-scrollbar">
 
-    <!-- SPLASH SCREEN (Hero Transition) -->
+    <!-- SPLASH SCREEN -->
     <div id="splash-screen" class="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none">
         <img id="splash-logo" src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Splash" class="max-h-20 md:max-h-28 w-auto object-contain animate-splash" style="top: 50%; left: 50%;">
     </div>
@@ -509,7 +509,6 @@
     <div id="app-content" class="relative z-10">
         <div id="viewer-page" class="min-h-screen flex flex-col items-center justify-start p-6 transition-all">
             <div class="max-w-4xl w-full flex flex-col items-center text-center mt-12 md:mt-24">
-                <!-- Main Logo -->
                 <img id="main-logo" src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-24 md:max-h-36 w-auto object-contain mb-10 transition-opacity duration-500">
                 
                 <div class="w-full max-w-[580px] px-4">
@@ -532,14 +531,14 @@
         <div id="maintenance-page" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-center">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mb-12 opacity-10 grayscale object-contain">
             <h2 class="text-red-900 text-xl font-bold uppercase tracking-[0.4em] mb-4 text-center">Under Maintenance</h2>
-            <p class="text-zinc-800 text-[9px] max-w-xs mx-auto leading-relaxed text-center uppercase tracking-widest font-light text-center w-full block">The digital gallery is currently being curated. <br> Please return later.</p>
+            <p class="text-zinc-800 text-[9px] max-w-xs mx-auto leading-relaxed text-center uppercase tracking-widest font-light">The digital gallery is currently being curated. <br> Please return later.</p>
             <footer class="mt-32"><a href="#admin" class="text-[7px] text-zinc-900 uppercase tracking-[0.6em] hover:text-zinc-800">Staff Access</a></footer>
         </div>
     </div>
 
     <!-- ADMIN LOGIN -->
     <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[10002]">
-        <div class="max-w-sm w-full bg-zinc-900/20 border border-zinc-900 p-12 rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl text-left">
+        <div class="max-w-sm w-full bg-zinc-900/20 border border-zinc-900 p-12 rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-16 w-auto mx-auto mb-10 object-contain opacity-50 block">
             <h2 class="text-xs font-bold mb-8 tracking-[0.4em] uppercase text-red-900 border-t border-zinc-900 pt-8 text-center">Secure Vault</h2>
             <input type="password" id="admin-password-input" placeholder="ACCESS CODE" class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl tracking-[0.5em] bg-black border border-zinc-900 text-white" onkeydown="if(event.key === 'Enter') window.checkAdminPassword()">
@@ -551,14 +550,14 @@
 
     <!-- ADMIN DASHBOARD -->
     <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12 relative z-10 text-left">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
-            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8">
+            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1">Exhibition Design & Sequence</p></div>
             <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
         </div>
-        <div class="grid lg:grid-cols-5 gap-10 text-left">
-            <div class="lg:col-span-2 text-left">
-                <div class="bg-zinc-900/10 p-8 rounded-[2.5rem] border border-zinc-900 sticky top-10 shadow-lg backdrop-blur-md text-left">
-                    <h2 class="text-xs font-bold mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600 text-left">
+        <div class="grid lg:grid-cols-5 gap-10">
+            <div class="lg:col-span-2">
+                <div class="bg-zinc-900/10 p-8 rounded-[2.5rem] border border-zinc-900 sticky top-10 shadow-lg backdrop-blur-md">
+                    <h2 class="text-xs font-bold mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
                         <span class="w-1 h-3 bg-red-900 mr-3 rounded-full"></span> New exhibit
                     </h2>
                     <form id="add-link-form" class="space-y-4">
@@ -575,10 +574,10 @@
                     </form>
                 </div>
             </div>
-            <div class="lg:col-span-3 text-left">
-                <div class="bg-zinc-900/5 p-8 rounded-[3rem] border border-zinc-900 text-left">
-                    <h2 class="text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700 text-left">Active Sequence</h2>
-                    <p class="text-[8px] text-zinc-800 mb-8 uppercase tracking-widest font-light text-left">Drag ☰ icons to reorder elements</p>
+            <div class="lg:col-span-3">
+                <div class="bg-zinc-900/5 p-8 rounded-[3rem] border border-zinc-900">
+                    <h2 class="text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700">Active Sequence</h2>
+                    <p class="text-[8px] text-zinc-800 mb-8 uppercase tracking-widest font-light">Drag ☰ icons to reorder elements</p>
                     <div id="admin-links-container" class="space-y-2 custom-scrollbar"></div>
                 </div>
             </div>
@@ -586,10 +585,10 @@
     </div>
 
     <!-- Modals -->
-    <div id="edit-modal" class="hidden fixed inset-0 z-[1100] items-center justify-center bg-black/98 p-4 backdrop-blur-2xl text-left">
-        <div class="bg-zinc-900/20 border border-zinc-900 p-10 rounded-[4rem] max-w-lg w-full shadow-2xl text-left">
+    <div id="edit-modal" class="hidden fixed inset-0 z-[1100] items-center justify-center bg-black/98 p-4 backdrop-blur-2xl">
+        <div class="bg-zinc-900/20 border border-zinc-900 p-10 rounded-[4rem] max-w-lg w-full shadow-2xl">
             <h3 class="text-xs font-bold mb-10 uppercase tracking-[0.3em] text-white text-center">Edit Item Details</h3>
-            <form id="edit-form" class="space-y-4 text-left">
+            <form id="edit-form" class="space-y-4">
                 <input type="hidden" id="edit-id">
                 <input type="text" id="edit-title" required class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
                 <textarea id="edit-description" placeholder="Description" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
@@ -604,18 +603,19 @@
                     <option value="show">🟢 PUBLIC</option>
                     <option value="hide">🔴 PRIVATE</option>
                 </select>
-                <div class="grid grid-cols-2 gap-4 mt-8 text-center">
+                <div class="grid grid-cols-2 gap-4 mt-8">
                     <button type="submit" class="bg-blue-950/20 border border-blue-900 text-blue-700 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-blue-900 hover:text-white transition-all">Save</button>
                     <button type="button" onclick="window.closeEditModal()" class="bg-zinc-900 text-zinc-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-zinc-800 transition-all">Back</button>
                 </div>
             </form>
         </div>
     </div>
+
     <div id="custom-confirm" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4">
-        <div class="bg-zinc-900/50 border border-zinc-900 p-12 rounded-[4rem] max-w-sm w-full text-center backdrop-blur-xl text-center">
-            <h3 class="text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900 text-center">Unregister Item?</h3>
-            <p class="text-zinc-600 text-[9px] mb-12 uppercase font-light tracking-[0.2em] text-center w-full block">Permanent removal from sequence</p>
-            <div class="grid grid-cols-2 gap-4 text-center">
+        <div class="bg-zinc-900/50 border border-zinc-900 p-12 rounded-[4rem] max-w-sm w-full text-center backdrop-blur-xl">
+            <h3 class="text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900">Unregister Item?</h3>
+            <p class="text-zinc-600 text-[9px] mb-12 uppercase font-light tracking-[0.2em]">Permanent removal from sequence</p>
+            <div class="grid grid-cols-2 gap-4">
                 <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-red-900 hover:text-white transition-all">Delete</button>
                 <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-900 text-zinc-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
             </div>
