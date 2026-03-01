@@ -93,7 +93,6 @@
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    // ปรับตำแหน่งเส้นขาวเป็น 39.6% เพื่อความแม่นยำตามคำขอ
                     const lineXPos = targetRect.left + (targetRect.width * 0.396);
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineXPos + 'px';
@@ -446,26 +445,27 @@
             position: relative;
         }
         
+        /* ปรับรัศมีแสงสีแดงฟุ้งๆ ให้กว้างออกมาอีกนิด (จาก 110% เป็น 130%) */
         body::before {
             content: "";
             position: absolute; 
-            top: -100px;
+            top: -60px;
             left: 50%; 
             transform: translateX(-50%);
-            width: 160%;
-            max-width: 1400px;
-            height: 600px;
-            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.22) 0%, rgba(220, 38, 38, 0.1) 45%, transparent 75%);
-            filter: blur(50px);
+            width: 130%; 
+            max-width: 1200px; 
+            height: 450px; 
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 68%);
+            filter: blur(45px);
             pointer-events: none; 
             z-index: 1; 
         }
 
         @media (min-width: 768px) {
             body::before {
-                width: 100%;
-                height: 500px;
-                background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.25) 0%, rgba(220, 38, 38, 0.1) 50%, transparent 80%);
+                width: 90%; 
+                height: 400px; 
+                background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.25) 0%, rgba(220, 38, 38, 0.1) 50%, transparent 75%);
             }
         }
 
