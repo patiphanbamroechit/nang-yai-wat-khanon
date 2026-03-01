@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ
+        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (พิกัดแม่นยำ 39.5%)
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -249,7 +249,7 @@
                     const embedUrl = getEmbedUrl(link.url);
                     return `
                         <div class="w-full mb-14 text-left">
-                            <h3 class="text-white text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
+                            <h3 class="text-white text-[11px] font-medium opacity-60 uppercase tracking-wider">${link.title}</h3>
                             <div class="relative aspect-video rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-4 shadow-2xl">
                                 ${embedUrl ? 
                                     `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>` : 
@@ -432,7 +432,7 @@
             width: 100%;
         }
         
-        /* แสงฟุ้งสีแดง (Red Glow) - ปรับปรุงให้อ่อนโยนและอยู่ใกล้ขอบบนสุด (Subtle & Tight) */
+        /* แสงฟุ้งสีแดง (Red Glow) - แก้ไขขอบตัดโดยใช้ ellipse และเพิ่มรัศมีจางหาย (Subtle & No Edge Cut) */
         body::before {
             content: "";
             position: absolute; 
@@ -440,12 +440,12 @@
             left: 50%; 
             transform: translateX(-50%);
             width: 100vw;
-            max-width: 1400px;
-            height: 450px; /* ลดความสูงลงเพื่อให้แสงอยู่แค่ขอบบน */
-            /* ปรับความเข้มให้อ่อนลง (0.12) และขยายระยะจาง (80%) */
-            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.12) 0%, transparent 80%);
+            max-width: 1600px;
+            height: 600px; /* เพิ่มพื้นที่สูงเพื่อให้แสงจางลงจนหมดก่อนถึงขอบ */
+            /* ปรับความอ่อนลง (0.08) และเปลี่ยนเป็น ellipse เพื่อกระจายด้านข้างแต่จางหายด้านล่างไวขึ้น */
+            background: radial-gradient(ellipse at 50% 0%, rgba(185, 28, 28, 0.08) 0%, rgba(185, 28, 28, 0.04) 40%, transparent 90%);
             pointer-events: none; 
-            z-index: -1; 
+            z-index: -1; /* อยู่หลังเนื้อหาเสมอ */
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -459,13 +459,13 @@
         }
         input:focus, textarea:focus, select:focus { border-color: #450a0a !important; }
 
-        /* Splash Screen Style */
+        /* Splash Screen Style - ปรับขนาดหดเข้าบนมือถือ (70vw) ไม่ให้กินขอบ */
         #splash-screen { background-color: black; transition: opacity 1.2s ease-in-out; }
         #splash-logo {
             transition: all 1s cubic-bezier(0.65, 0, 0.35, 1);
             position: fixed; z-index: 10001;
             transform: translate(-50%, -50%) scale(1.1);
-            max-width: 70vw; /* หดขอบซ้ายขวาเข้ามามากขึ้นบนโทรศัพท์ */
+            max-width: 70vw; 
             height: auto;
             filter: drop-shadow(0 0 30px rgba(153, 27, 27, 0.4));
         }
