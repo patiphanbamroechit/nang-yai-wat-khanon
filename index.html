@@ -150,10 +150,10 @@
         const updateStatusUI = () => {
             if (siteStatus === 'open') {
                 siteStatusBtn.innerHTML = '<span class="text-green-500 font-bold text-[10px]">🟢 ONLINE</span>';
-                siteStatusBtn.className = "px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg bg-green-600/5";
+                siteStatusBtn.className = "px-3 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg bg-green-600/5";
             } else {
                 siteStatusBtn.innerHTML = '<span class="text-red-500 font-bold text-[10px]">🔴 CLOSED</span>';
-                siteStatusBtn.className = "px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg bg-red-600/5";
+                siteStatusBtn.className = "px-3 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg bg-red-600/5";
             }
         };
 
@@ -302,23 +302,23 @@
             adminLinksContainer.innerHTML = links.map((link) => {
                 const isHidden = link.status === 'hide';
                 return `
-                <div data-id="${link.id}" class="bg-zinc-900/40 border ${isHidden ? 'border-zinc-800/30 opacity-40' : 'border-zinc-800'} p-4 rounded-2xl mb-3 flex items-center justify-between group transition-all cursor-grab active:cursor-grabbing text-left">
-                    <div class="flex items-center mr-4">
-                        <span class="text-zinc-800 mr-4 select-none">☰</span>
+                <div data-id="${link.id}" class="bg-zinc-900/40 border ${isHidden ? 'border-zinc-800/30 opacity-40' : 'border-zinc-800'} p-3 md:p-4 rounded-2xl mb-3 flex items-center justify-between group transition-all cursor-grab active:cursor-grabbing text-left">
+                    <div class="flex items-center mr-2 md:mr-4 min-w-0">
+                        <span class="text-zinc-800 mr-2 md:mr-4 select-none">☰</span>
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-[8px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
-                                <h3 class="text-white text-xs font-bold truncate">${link.title}</h3>
+                            <div class="flex items-center gap-1 md:gap-2 mb-1">
+                                <span class="text-[7px] md:text-[8px] px-1.5 md:px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
+                                <h3 class="text-white text-[10px] md:text-xs font-bold truncate">${link.title}</h3>
                             </div>
-                            <p class="text-[9px] text-zinc-700 truncate max-w-[150px]">${link.description || link.url || '-'}</p>
+                            <p class="text-[8px] md:text-[9px] text-zinc-700 truncate">${link.description || link.url || '-'}</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <button onclick="window.toggleStatus('${link.id}', '${link.status || 'show'}')" class="p-2 ${isHidden ? 'text-zinc-600' : 'text-green-900'} rounded-lg hover:bg-white/5 transition-colors">
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="window.toggleStatus('${link.id}', '${link.status || 'show'}')" class="p-1.5 md:p-2 ${isHidden ? 'text-zinc-600' : 'text-green-900'} rounded-lg hover:bg-white/5 transition-colors">
                             ${isHidden ? '👁️‍🗨️' : '👁️'}
                         </button>
-                        <button onclick="window.openEditModal('${link.id}')" class="px-3 py-2 bg-blue-900/10 text-blue-700 rounded-xl text-[9px] font-bold">EDIT</button>
-                        <button onclick="window.deleteLink('${link.id}')" class="px-3 py-2 bg-red-900/10 text-red-900 rounded-xl text-[9px] font-bold">DEL</button>
+                        <button onclick="window.openEditModal('${link.id}')" class="px-2 md:px-3 py-1.5 md:py-2 bg-blue-900/10 text-blue-700 rounded-xl text-[8px] md:text-[9px] font-bold">EDIT</button>
+                        <button onclick="window.deleteLink('${link.id}')" class="px-2 md:px-3 py-1.5 md:py-2 bg-red-900/10 text-red-900 rounded-xl text-[8px] md:text-[9px] font-bold">DEL</button>
                     </div>
                 </div>
             `}).join('');
@@ -374,7 +374,6 @@
             document.getElementById('edit-status').value = link.status || 'show';
             document.getElementById('edit-ratio').value = link.ratio || '16/9';
             
-            // เช็คสถานะช่อง Ratio เมื่อเปิด Modal
             window.handleTypeChange('edit');
             
             editModal.classList.remove('hidden');
@@ -416,7 +415,7 @@
                     title, url, type, description, ratio, createdAt, order: createdAt, status: 'show'
                 });
                 addLinkForm.reset();
-                window.handleTypeChange('add'); // คืนค่าการซ่อนช่อง Ratio
+                window.handleTypeChange('add');
             } catch (err) { console.error(err); }
         };
 
@@ -607,7 +606,7 @@
 
     <!-- ADMIN LOGIN -->
     <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[10002]">
-        <div class="max-w-sm w-full bg-zinc-900/20 border border-zinc-900 p-12 rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
+        <div class="max-w-sm w-full bg-zinc-900/20 border border-zinc-900 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-16 w-auto mx-auto mb-10 object-contain opacity-50 block">
             <h2 class="text-xs font-bold mb-8 tracking-[0.4em] uppercase text-red-900 border-t border-zinc-900 pt-8 text-center">Secure Vault</h2>
             <input type="password" id="admin-password-input" placeholder="ACCESS CODE" class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl placeholder:text-[10px] placeholder:tracking-[0.8em] tracking-[0.5em] bg-black border border-zinc-900 text-white" onkeydown="if(event.key === 'Enter') window.checkAdminPassword()">
@@ -618,34 +617,33 @@
     </div>
 
     <!-- ADMIN DASHBOARD -->
-    <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12 relative z-10 text-left">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
-            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
-            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
+    <div id="admin-page" class="hidden max-w-6xl mx-auto px-4 md:px-6 py-12 relative z-10 text-left">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 md:mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
+            <div><h1 class="text-xl md:text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
+            <div class="flex items-center gap-2 md:gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-3 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-4 md:px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
         </div>
-        <div class="grid lg:grid-cols-5 gap-10 text-left">
+        <div class="grid lg:grid-cols-5 gap-6 md:gap-10 text-left">
             <div class="lg:col-span-2">
-                <div class="bg-zinc-900/10 p-8 rounded-[2.5rem] border border-zinc-900 sticky top-10 shadow-lg backdrop-blur-md text-left">
-                    <h2 class="text-xs font-bold mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
+                <div class="bg-zinc-900/10 p-5 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 sticky top-10 shadow-lg backdrop-blur-md text-left">
+                    <h2 class="text-[10px] md:text-xs font-bold mb-6 md:mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600 text-left">
                         <span class="w-1 h-3 bg-red-900 mr-3 rounded-full text-left"></span> New exhibit
                     </h2>
                     <form id="add-link-form" class="space-y-4 text-left">
-                        <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
-                        <textarea id="description" placeholder="DESCRIPTION (OPTIONAL)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
-                        <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
+                        <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                        <textarea id="description" placeholder="DESCRIPTION (OPTIONAL)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px]"></textarea>
+                        <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
                         
                         <div class="space-y-4">
-                            <select id="type" onchange="window.handleTypeChange('add')" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                            <select id="type" onchange="window.handleTypeChange('add')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
                                 <option value="link">🔗 Link Card</option>
                                 <option value="image">🖼️ Static Image</option>
                                 <option value="video">🎥 Motion Video</option>
                                 <option value="text">📝 Narrative Text</option>
                             </select>
                             
-                            <!-- Wrapper สำหรับซ่อน/แสดงช่อง Aspect Ratio -->
                             <div id="add-ratio-wrapper" class="hidden">
-                                <label class="text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
-                                <select id="add-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest border-red-900/20 bg-red-900/5">
+                                <label class="text-[7px] md:text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
+                                <select id="add-ratio" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest border-red-900/20 bg-red-900/5">
                                     <option value="16/9">📐 16:9 (Standard)</option>
                                     <option value="1/1">📐 1:1 (Square)</option>
                                     <option value="9/16">📐 9:16 (Vertical)</option>
@@ -654,14 +652,14 @@
                             </div>
                         </div>
                         
-                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all hover:bg-red-900 hover:text-white text-center">Add to Sequence</button>
+                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:bg-red-900 hover:text-white text-center">Add to Sequence</button>
                     </form>
                 </div>
             </div>
             <div class="lg:col-span-3">
-                <div class="bg-zinc-900/5 p-8 rounded-[3rem] border border-zinc-900 text-left">
-                    <h2 class="text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700">Active Sequence</h2>
-                    <p class="text-[8px] text-zinc-800 mb-8 uppercase tracking-widest font-light">Drag ☰ icons to reorder elements</p>
+                <div class="bg-zinc-900/5 p-5 md:p-8 rounded-3xl md:rounded-[3rem] border border-zinc-900 text-left">
+                    <h2 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700 text-left">Active Sequence</h2>
+                    <p class="text-[7px] md:text-[8px] text-zinc-800 mb-6 md:mb-8 uppercase tracking-widest font-light text-left">Drag ☰ icons to reorder elements</p>
                     <div id="admin-links-container" class="space-y-2 custom-scrollbar"></div>
                 </div>
             </div>
@@ -670,26 +668,25 @@
 
     <!-- Modals -->
     <div id="edit-modal" class="hidden fixed inset-0 z-[1100] items-center justify-center bg-black/98 p-4 backdrop-blur-2xl">
-        <div class="bg-zinc-900/20 border border-zinc-900 p-10 rounded-[4rem] max-w-lg w-full shadow-2xl">
-            <h3 class="text-xs font-bold mb-10 uppercase tracking-[0.3em] text-white text-center">Edit Item Details</h3>
+        <div class="bg-zinc-900/20 border border-zinc-900 p-6 md:p-10 rounded-3xl md:rounded-[4rem] max-w-lg w-full shadow-2xl">
+            <h3 class="text-[10px] md:text-xs font-bold mb-6 md:mb-10 uppercase tracking-[0.3em] text-white text-center">Edit Item Details</h3>
             <form id="edit-form" class="space-y-4">
                 <input type="hidden" id="edit-id">
-                <input type="text" id="edit-title" required class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
-                <textarea id="edit-description" placeholder="Description" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
-                <input type="url" id="edit-url" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
+                <input type="text" id="edit-title" required class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                <textarea id="edit-description" placeholder="Description" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px]"></textarea>
+                <input type="url" id="edit-url" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
                 
                 <div class="space-y-4">
-                    <select id="edit-type" onchange="window.handleTypeChange('edit')" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                    <select id="edit-type" onchange="window.handleTypeChange('edit')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
                         <option value="link">Link Card</option>
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="text">Narrative Text</option>
                     </select>
                     
-                    <!-- Wrapper สำหรับซ่อน/แสดงช่อง Aspect Ratio ในหน้าแก้ไข -->
                     <div id="edit-ratio-wrapper" class="hidden">
-                        <label class="text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
-                        <select id="edit-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest border-red-900/20">
+                        <label class="text-[7px] md:text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
+                        <select id="edit-ratio" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest border-red-900/20">
                             <option value="16/9">16:9 (Standard)</option>
                             <option value="1/1">1:1 (Square)</option>
                             <option value="9/16">9:16 (Vertical)</option>
@@ -698,25 +695,25 @@
                     </div>
                 </div>
 
-                <select id="edit-status" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest mt-2 border-zinc-900">
+                <select id="edit-status" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest mt-2 border-zinc-900">
                     <option value="show">🟢 PUBLIC</option>
                     <option value="hide">🔴 PRIVATE</option>
                 </select>
-                <div class="grid grid-cols-2 gap-4 mt-8">
-                    <button type="submit" class="bg-blue-950/20 border border-blue-900 text-blue-700 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-blue-900 hover:text-white transition-all">Save</button>
-                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-900 text-zinc-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-zinc-800 transition-all">Back</button>
+                <div class="grid grid-cols-2 gap-3 md:gap-4 mt-8">
+                    <button type="submit" class="bg-blue-950/20 border border-blue-900 text-blue-700 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-blue-900 hover:text-white transition-all">Save</button>
+                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-900 text-zinc-600 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-zinc-800 transition-all">Back</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="custom-confirm" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4">
-        <div class="bg-zinc-900/50 border border-zinc-900 p-12 rounded-[4rem] max-w-sm w-full text-center backdrop-blur-xl">
-            <h3 class="text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900">Unregister Item?</h3>
-            <p class="text-zinc-600 text-[9px] mb-12 uppercase font-light tracking-[0.2em]">Permanent removal from sequence</p>
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-red-900 hover:text-white transition-all">Delete</button>
-                <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-900 text-zinc-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
+        <div class="bg-zinc-900/50 border border-zinc-900 p-8 md:p-12 rounded-3xl md:rounded-[4rem] max-w-sm w-full text-center backdrop-blur-xl">
+            <h3 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900">Unregister Item?</h3>
+            <p class="text-zinc-600 text-[8px] md:text-[9px] mb-8 md:mb-12 uppercase font-light tracking-[0.2em]">Permanent removal from sequence</p>
+            <div class="grid grid-cols-2 gap-3 md:gap-4">
+                <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-red-900 hover:text-white transition-all">Delete</button>
+                <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-900 text-zinc-600 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
             </div>
         </div>
     </div>
