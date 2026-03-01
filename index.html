@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Planning | Nang Yai Wat Khanon</title>
-    <!-- แก้ไข Favicon ของเว็บไซต์เป็นลิงก์ใหม่ล่าสุดตามที่ระบุ -->
+    <!-- Favicon -->
     <link rel="icon" type="image/png" href="https://img5.pic.in.th/file/secure-sv1/LOGO46a10e1dd4b0ec16.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,7 +15,7 @@
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration (สำหรับรันบน GitHub และ Preview) ---
+        // --- Firebase Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyDo5SurxNWO9Sw9T2ReiL39bC5dBE8gUn4",
             authDomain: "nang-yai-wat-khanon.firebaseapp.com",
@@ -26,10 +26,7 @@
             measurementId: "G-N8CVF98TZX"
         };
 
-        // กำหนด ID สำหรับโครงสร้างข้อมูลใน Firestore
         const app_id_path = "nang-yai-wat-khanon-project";
-
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
         const auth = getAuth(app);
@@ -49,7 +46,6 @@
         const addLinkForm = document.getElementById('add-link-form');
         const editModal = document.getElementById('edit-modal');
 
-        // ฟังก์ชันล๊อกอินอัตโนมัติ (Anonymous)
         const initAuth = async () => {
             try {
                 await signInAnonymously(auth);
@@ -80,7 +76,6 @@
             viewerPage.classList.add('hidden');
             adminPage.classList.add('hidden');
             adminLoginPage.classList.add('hidden');
-
             const hash = window.location.hash;
             
             if (hash === '#admin') {
@@ -102,26 +97,20 @@
             onSnapshot(linksCol, (snapshot) => {
                 links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 links.sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
-                
                 isInitialLoad = false; 
-
                 if (isAdmin) renderAdminLinks();
                 else renderViewerLinks();
             }, (error) => {
                 console.error("Firestore error:", error);
                 isInitialLoad = false;
-                if (!isAdmin) {
-                    linksContainer.innerHTML = '<p class="text-red-500 py-10 text-[10px]">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
-                }
+                if (!isAdmin) linksContainer.innerHTML = '<p class="text-red-500 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
             });
         };
 
         const getEmbedUrl = (url) => {
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
-            if (match && match[2].length === 11) {
-                return `https://www.youtube.com/embed/${match[2]}`;
-            }
+            if (match && match[2].length === 11) return `https://www.youtube.com/embed/${match[2]}`;
             return null;
         };
 
@@ -136,41 +125,52 @@
             }
 
             linksContainer.innerHTML = links.map(link => {
+                const descHtml = link.description ? `<p class="text-zinc-500 text-[10px] md:text-xs mt-2 leading-relaxed whitespace-pre-wrap">${link.description}</p>` : '';
+                
                 if (link.type === 'image') {
                     return `
-                        <div class="w-full mb-10">
-                            <h3 class="text-white text-[11px] mb-3 font-medium opacity-80 text-left uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative overflow-hidden rounded-2xl border border-zinc-800 shadow-xl">
+                        <div class="w-full mb-12 text-left">
+                            <h3 class="text-white text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
+                            <div class="relative overflow-hidden rounded-2xl border border-zinc-800 shadow-xl mt-3">
                                 <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-cover" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
                             </div>
+                            ${descHtml}
                         </div>
                     `;
                 } else if (link.type === 'video') {
                     const embedUrl = getEmbedUrl(link.url);
                     return `
-                        <div class="w-full mb-10">
-                            <h3 class="text-white text-[11px] mb-3 font-medium opacity-80 text-left uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800 bg-black">
+                        <div class="w-full mb-12 text-left">
+                            <h3 class="text-white text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
+                            <div class="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800 bg-black mt-3">
                                 ${embedUrl ? 
-                                    `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` : 
-                                    `<div class="flex flex-col items-center justify-center h-full text-zinc-600 text-center p-4">
+                                    `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>` : 
+                                    `<div class="flex flex-col items-center justify-center h-full text-zinc-600 p-4">
                                         <span class="text-4xl mb-2">🎥</span>
-                                        <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline decoration-zinc-800">คลิกเพื่อดูวัยดีโอภายนอก</a>
+                                        <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline">ดูวิดีโอภายนอก</a>
                                     </div>`
                                 }
                             </div>
+                            ${descHtml}
+                        </div>
+                    `;
+                } else if (link.type === 'text') {
+                    return `
+                        <div class="w-full mb-12 text-left p-6 rounded-2xl border border-zinc-800 bg-zinc-900/20 shadow-lg">
+                            <h3 class="text-red-600 text-[11px] font-bold uppercase tracking-widest border-b border-zinc-800 pb-3 mb-3">${link.title}</h3>
+                            <p class="text-zinc-300 text-xs md:text-sm leading-relaxed whitespace-pre-wrap">${link.description || 'ไม่มีคำอธิบาย'}</p>
                         </div>
                     `;
                 } else {
                     return `
-                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/40 border border-zinc-800 hover:border-red-600/50 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden backdrop-blur-md text-left mb-6 shadow-lg">
-                            <div class="flex items-center space-x-4 relative z-10">
+                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/40 border border-zinc-800 hover:border-red-600/50 p-6 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 backdrop-blur-md text-left mb-6 shadow-lg">
+                            <div class="flex items-center space-x-4">
                                 <div class="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800/50 text-zinc-400 group-hover:text-red-500 group-hover:bg-red-500/10 transition-colors">
                                     <span class="text-lg">🔗</span>
                                 </div>
                                 <div class="flex-1 overflow-hidden">
                                     <h3 class="text-white text-xs md:text-sm truncate font-medium">${link.title}</h3>
-                                    <p class="text-zinc-600 text-[10px] truncate font-light mt-0.5">${link.url}</p>
+                                    ${link.description ? `<p class="text-zinc-600 text-[9px] mt-0.5 truncate">${link.description}</p>` : `<p class="text-zinc-600 text-[9px] truncate font-light mt-0.5">${link.url}</p>`}
                                 </div>
                                 <span class="text-red-600 opacity-0 group-hover:opacity-100 transition-opacity font-bold text-xl">→</span>
                             </div>
@@ -192,11 +192,11 @@
                             <span class="text-[9px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
                             <h3 class="text-white text-sm font-bold truncate">${link.title}</h3>
                         </div>
-                        <p class="text-[10px] text-zinc-500 truncate font-mono opacity-50">${link.url}</p>
+                        <p class="text-[10px] text-zinc-600 truncate">${link.description || link.url || '-'}</p>
                     </div>
                     <div class="flex items-center gap-1">
-                        <button onclick="window.moveItem(${index}, -1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors disabled:opacity-5 disabled:cursor-not-allowed" ${index === 0 ? 'disabled' : ''}>▲</button>
-                        <button onclick="window.moveItem(${index}, 1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors disabled:opacity-5 disabled:cursor-not-allowed" ${index === links.length - 1 ? 'disabled' : ''}>▼</button>
+                        <button onclick="window.moveItem(${index}, -1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors" ${index === 0 ? 'disabled opacity-20' : ''}>▲</button>
+                        <button onclick="window.moveItem(${index}, 1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors" ${index === links.length - 1 ? 'disabled opacity-20' : ''}>▼</button>
                         <button onclick="window.openEditModal('${link.id}')" class="px-3 py-2 bg-blue-600/10 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-bold">EDIT</button>
                         <button onclick="window.deleteLink('${link.id}')" class="px-3 py-2 bg-red-600/10 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[10px] font-bold ml-1">DEL</button>
                     </div>
@@ -207,17 +207,12 @@
         window.moveItem = async (index, direction) => {
             const targetIndex = index + direction;
             if (targetIndex < 0 || targetIndex >= links.length) return;
-
-            const itemA = links[index];
-            const itemB = links[targetIndex];
-
-            const orderA = itemA.order ?? itemA.createdAt ?? 0;
-            const orderB = itemB.order ?? itemB.createdAt ?? 0;
-
+            const itemA = links[index], itemB = links[targetIndex];
+            const orderA = itemA.order ?? itemA.createdAt ?? 0, orderB = itemB.order ?? itemB.createdAt ?? 0;
             try {
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', itemA.id), { order: orderB });
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', itemB.id), { order: orderA });
-            } catch (err) { console.error("Swap error:", err); }
+            } catch (err) { console.error(err); }
         };
 
         window.openEditModal = async (id) => {
@@ -225,8 +220,9 @@
             if (!link) return;
             document.getElementById('edit-id').value = id;
             document.getElementById('edit-title').value = link.title;
-            document.getElementById('edit-url').value = link.url;
+            document.getElementById('edit-url').value = link.url || '';
             document.getElementById('edit-type').value = link.type;
+            document.getElementById('edit-description').value = link.description || '';
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
         };
@@ -242,13 +238,13 @@
             const title = document.getElementById('edit-title').value;
             const url = document.getElementById('edit-url').value;
             const type = document.getElementById('edit-type').value;
-
+            const description = document.getElementById('edit-description').value;
             try {
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), {
-                    title, url, type
+                    title, url, type, description
                 });
                 window.closeEditModal();
-            } catch (err) { console.error("Update error:", err); }
+            } catch (err) { console.error(err); }
         };
 
         addLinkForm.onsubmit = async (e) => {
@@ -256,10 +252,11 @@
             const title = document.getElementById('title').value;
             const url = document.getElementById('url').value;
             const type = document.getElementById('type').value;
+            const description = document.getElementById('description').value;
             const createdAt = Date.now();
             try {
                 await addDoc(collection(db, 'artifacts', app_id_path, 'public', 'data', 'links'), {
-                    title, url, type, createdAt, order: createdAt
+                    title, url, type, description, createdAt, order: createdAt
                 });
                 addLinkForm.reset();
             } catch (err) { console.error(err); }
@@ -319,6 +316,15 @@
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+
+        input, textarea, select {
+            background-color: black !important;
+            border: 1px solid #27272a !important;
+            color: white !important;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: #dc2626 !important;
+        }
     </style>
 </head>
 <body class="min-h-screen red-gradient-base custom-scrollbar">
@@ -327,28 +333,23 @@
     <div id="viewer-page" class="min-h-screen flex flex-col items-center justify-start p-6 transition-all relative">
         <div class="max-w-4xl w-full flex flex-col items-center text-center mt-12 md:mt-24">
             
-            <!-- Logo Image -->
-            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Nang Yai Wat Khanon Logo" class="h-24 md:h-36 w-auto object-contain mb-10 transition-all">
+            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="h-24 md:h-36 w-auto object-contain mb-10 transition-all">
             
-            <!-- Project Title Image -->
             <div class="w-full max-w-[580px] px-4">
-                <img src="https://img2.pic.in.th/Asset-110xe5b202fc57a60b74.png" alt="Project Title Image" class="w-full h-auto object-contain">
+                <img src="https://img2.pic.in.th/Asset-110xe5b202fc57a60b74.png" alt="Project Title" class="w-full h-auto object-contain">
             </div>
 
-            <!-- Red Bar -->
             <div class="w-full flex justify-center mt-5 mb-12">
                 <div class="w-[80px] h-[3px] bg-red-600 rounded-full opacity-60 shadow-[0_0_15px_rgba(220,38,38,0.3)]"></div>
             </div>
 
-            <!-- Dynamic Content Feed -->
-            <div id="links-container" class="space-y-12 max-w-[500px] w-full mx-auto">
+            <div id="links-container" class="space-y-12 max-w-[500px] w-full mx-auto pb-40">
                 <div class="animate-pulse space-y-10">
                     <div class="h-48 bg-zinc-900 rounded-2xl border border-zinc-800 opacity-20"></div>
                 </div>
             </div>
 
-            <!-- Admin Entry point at the very bottom -->
-            <footer class="w-full py-32 mt-20">
+            <footer class="w-full py-32">
                 <a href="#admin" class="text-zinc-900 hover:text-zinc-700 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
             </footer>
         </div>
@@ -360,12 +361,10 @@
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="h-16 mx-auto mb-8 object-contain opacity-80">
             <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600 border-t border-zinc-800 pt-8">Admin Key</h2>
             <input type="password" id="admin-password-input" placeholder="Password" 
-                class="w-full bg-black border border-zinc-800 rounded-2xl p-4 mb-4 outline-none focus:border-red-600 text-center text-xl tracking-widest font-sans text-white"
+                class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl tracking-widest"
                 onkeypress="if(event.key === 'Enter') window.checkAdminPassword()">
             <p id="login-error" class="text-red-500 text-[10px] mb-4 hidden uppercase tracking-widest">Wrong Password</p>
-            <button onclick="window.checkAdminPassword()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all uppercase tracking-widest text-xs">
-                Login
-            </button>
+            <button onclick="window.checkAdminPassword()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all uppercase tracking-widest text-xs">Login</button>
             <a href="#" class="inline-block mt-8 text-zinc-600 hover:text-white text-[10px] uppercase tracking-widest transition-colors">← Exit</a>
         </div>
     </div>
@@ -386,13 +385,15 @@
                     <h2 class="text-sm font-bold mb-8 flex items-center uppercase tracking-widest text-zinc-400">
                         <span class="w-1 h-4 bg-red-600 mr-3"></span> New exhibit
                     </h2>
-                    <form id="add-link-form" class="space-y-6">
-                        <input type="text" id="title" required placeholder="Exhibit Title" class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-red-600 text-xs text-white">
-                        <input type="url" id="url" required placeholder="Source URL (YouTube/Image)" class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-red-600 text-xs text-white">
-                        <select id="type" class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-red-600 appearance-none text-xs text-white">
-                            <option value="link">🔗 General Link Card</option>
-                            <option value="image">🖼️ Visual Image</option>
-                            <option value="video">🎥 YouTube Video</option>
+                    <form id="add-link-form" class="space-y-4">
+                        <input type="text" id="title" required placeholder="ชื่อหัวข้อ (เช่น ชื่อตอน, ชื่อประกาศ)" class="w-full rounded-xl p-4 outline-none text-xs">
+                        <textarea id="description" placeholder="คำอธิบาย (ถ้ามี)" class="w-full rounded-xl p-4 outline-none text-xs min-h-[100px]"></textarea>
+                        <input type="url" id="url" placeholder="Source URL (ไม่จำเป็นสำหรับข้อความอย่างเดียว)" class="w-full rounded-xl p-4 outline-none text-xs">
+                        <select id="type" class="w-full rounded-xl p-4 outline-none appearance-none text-xs">
+                            <option value="link">🔗 ลิงก์ทั่วไป (ปุ่มกด)</option>
+                            <option value="image">🖼️ รูปภาพ (แสดงทันที)</option>
+                            <option value="video">🎥 วิดีโอ (YouTube)</option>
+                            <option value="text">📝 ข้อความอย่างเดียว</option>
                         </select>
                         <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all text-xs uppercase tracking-widest">Publish</button>
                     </form>
@@ -411,18 +412,20 @@
     <div id="edit-modal" class="hidden fixed inset-0 z-[200] items-center justify-center bg-black/95 backdrop-blur-xl p-4">
         <div class="bg-zinc-900 border border-zinc-800 p-10 rounded-[3.5rem] max-w-lg w-full shadow-2xl text-left">
             <h3 class="text-lg font-bold mb-8 uppercase tracking-widest text-white text-center">Update Details</h3>
-            <form id="edit-form" class="space-y-6">
+            <form id="edit-form" class="space-y-4">
                 <input type="hidden" id="edit-id">
-                <input type="text" id="edit-title" required class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-blue-600 text-xs text-white">
-                <input type="url" id="edit-url" required class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-blue-600 text-xs text-white">
-                <select id="edit-type" class="w-full bg-black border border-zinc-800 rounded-xl p-4 outline-none focus:border-blue-600 appearance-none text-xs text-white">
+                <input type="text" id="edit-title" required class="w-full rounded-xl p-4 outline-none text-xs">
+                <textarea id="edit-description" placeholder="คำอธิบาย" class="w-full rounded-xl p-4 outline-none text-xs min-h-[100px]"></textarea>
+                <input type="url" id="edit-url" class="w-full rounded-xl p-4 outline-none text-xs">
+                <select id="edit-type" class="w-full rounded-xl p-4 outline-none appearance-none text-xs">
                     <option value="link">🔗 Link Card</option>
                     <option value="image">🖼️ Image</option>
                     <option value="video">🎥 Video</option>
+                    <option value="text">📝 Text Only</option>
                 </select>
                 <div class="grid grid-cols-2 gap-4">
-                    <button type="submit" class="bg-blue-600 text-white py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all">Save Changes</button>
-                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-zinc-700 transition-all">Cancel</button>
+                    <button type="submit" class="bg-blue-600 text-white py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-blue-700">Save</button>
+                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-zinc-700">Cancel</button>
                 </div>
             </form>
         </div>
