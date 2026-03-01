@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - ล็อก Scrollbar จนกว่าจะเสร็จสิ้น
+        // Cinematic Transition Logic
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -105,15 +105,21 @@
                         transitionOverlay.style.left = "50%"; 
                         
                         setTimeout(() => {
+                            // ปรับแก้: แสดงเนื้อหาทันทีข้างหลังแผ่นสีขาว (ไม่มีจาง) เพื่อป้องกันการกระพริบ
+                            appContent.style.transition = 'none';
                             appContent.style.opacity = "1";
                             mainLogo.style.opacity = "1";
+                            
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
+                            
+                            // ให้แผ่นสีขาวเป็นตัวค่อยๆ จางออกแทน (Reveal Effect)
+                            transitionOverlay.style.transition = 'opacity 1.2s ease-out';
                             transitionOverlay.style.opacity = "0";
                             
-                            // คืนค่าการเลื่อนหน้าจอเฉพาะแนวตั้ง เมื่อกระบวนการทุกอย่างจบลง
                             setTimeout(() => {
                                 transitionOverlay.style.display = 'none';
+                                // คืนค่าการเลื่อนหน้าจอ
                                 document.documentElement.style.overflowY = 'auto';
                                 document.documentElement.style.overflowX = 'hidden';
                                 document.body.style.overflowY = 'auto'; 
@@ -419,20 +425,19 @@
         @font-face { font-family: 'SaoChingcha'; src: url('SaoChingcha-Regular.otf') format('opentype'); font-weight: 400; }
         @font-face { font-family: 'SaoChingcha'; src: url('SaoChingcha-Bold.otf') format('opentype'); font-weight: 700; }
 
-        /* ล็อก Scrollbar เริ่มต้น */
+        /* ป้องกันการเลื่อนขวาในระดับ HTML และ BODY */
         html, body {
-            overflow: hidden;
+            overflow-x: hidden;
             width: 100%;
-            height: 100%;
             position: relative;
             margin: 0;
             padding: 0;
             max-width: 100vw;
+            background-color: #000;
         }
 
         body { 
             font-family: 'SaoChingcha', sans-serif; 
-            background-color: #000; 
             color: #fff; 
         }
         
@@ -493,11 +498,11 @@
             transition: height 0.8s cubic-bezier(0.65, 0, 0.35, 1), width 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease, left 0.8s cubic-bezier(0.65, 0, 0.35, 1);
             pointer-events: none;
             box-shadow: 0 0 40px rgba(255,255,255,0.6);
+            will-change: opacity, transform;
         }
 
         #app-content { 
             opacity: 0; 
-            transition: opacity 2s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
             max-width: 100%;
         }
@@ -588,17 +593,17 @@
 
     <!-- ADMIN DASHBOARD -->
     <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12 relative z-10 text-left">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8">
-            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1">Exhibition Design & Sequence</p></div>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
+            <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
             <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
         </div>
         <div class="grid lg:grid-cols-5 gap-10 text-left">
             <div class="lg:col-span-2">
-                <div class="bg-zinc-900/10 p-8 rounded-[2.5rem] border border-zinc-900 sticky top-10 shadow-lg backdrop-blur-md">
+                <div class="bg-zinc-900/10 p-8 rounded-[2.5rem] border border-zinc-900 sticky top-10 shadow-lg backdrop-blur-md text-left">
                     <h2 class="text-xs font-bold mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
-                        <span class="w-1 h-3 bg-red-900 mr-3 rounded-full"></span> New exhibit
+                        <span class="w-1 h-3 bg-red-900 mr-3 rounded-full text-left"></span> New exhibit
                     </h2>
-                    <form id="add-link-form" class="space-y-4">
+                    <form id="add-link-form" class="space-y-4 text-left">
                         <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
                         <textarea id="description" placeholder="DESCRIPTION (OPTIONAL)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
                         <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
@@ -608,12 +613,12 @@
                             <option value="video">🎥 Motion Video</option>
                             <option value="text">📝 Narrative Text</option>
                         </select>
-                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all hover:bg-red-900 hover:text-white">Add to Sequence</button>
+                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all hover:bg-red-900 hover:text-white text-center">Add to Sequence</button>
                     </form>
                 </div>
             </div>
             <div class="lg:col-span-3">
-                <div class="bg-zinc-900/5 p-8 rounded-[3rem] border border-zinc-900">
+                <div class="bg-zinc-900/5 p-8 rounded-[3rem] border border-zinc-900 text-left">
                     <h2 class="text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700">Active Sequence</h2>
                     <p class="text-[8px] text-zinc-800 mb-8 uppercase tracking-widest font-light">Drag ☰ icons to reorder elements</p>
                     <div id="admin-links-container" class="space-y-2 custom-scrollbar"></div>
