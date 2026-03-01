@@ -352,6 +352,17 @@
             } catch (err) { console.error(err); }
         };
 
+        // Logic สำหรับการซ่อน/แสดงช่องเลือกอัตราส่วน
+        window.handleTypeChange = (mode) => {
+            const typeSelect = document.getElementById(mode === 'add' ? 'type' : 'edit-type');
+            const ratioWrapper = document.getElementById(mode === 'add' ? 'add-ratio-wrapper' : 'edit-ratio-wrapper');
+            if (typeSelect.value === 'video') {
+                ratioWrapper.classList.remove('hidden');
+            } else {
+                ratioWrapper.classList.add('hidden');
+            }
+        };
+
         window.openEditModal = async (id) => {
             const link = links.find(l => l.id === id);
             if (!link) return;
@@ -362,6 +373,10 @@
             document.getElementById('edit-description').value = link.description || '';
             document.getElementById('edit-status').value = link.status || 'show';
             document.getElementById('edit-ratio').value = link.ratio || '16/9';
+            
+            // เช็คสถานะช่อง Ratio เมื่อเปิด Modal
+            window.handleTypeChange('edit');
+            
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
         };
@@ -401,6 +416,7 @@
                     title, url, type, description, ratio, createdAt, order: createdAt, status: 'show'
                 });
                 addLinkForm.reset();
+                window.handleTypeChange('add'); // คืนค่าการซ่อนช่อง Ratio
             } catch (err) { console.error(err); }
         };
 
@@ -449,27 +465,26 @@
             position: relative;
         }
         
-        /* แสงฟุ้งสีแดง */
         body::before {
             content: "";
             position: absolute; 
-            top: -60px;
+            top: -100px;
             left: 50%; 
             transform: translateX(-50%);
-            width: 130%; 
-            max-width: 1200px; 
-            height: 450px; 
-            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 68%);
-            filter: blur(45px);
+            width: 160%;
+            max-width: 1400px;
+            height: 600px;
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.18) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 75%);
+            filter: blur(40px);
             pointer-events: none; 
             z-index: 1; 
         }
 
         @media (min-width: 768px) {
             body::before {
-                width: 90%; 
-                height: 400px; 
-                background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.25) 0%, rgba(220, 38, 38, 0.1) 50%, transparent 75%);
+                width: 100%;
+                height: 500px;
+                background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.08) 50%, transparent 80%);
             }
         }
 
@@ -618,21 +633,27 @@
                         <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
                         <textarea id="description" placeholder="DESCRIPTION (OPTIONAL)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
                         <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
-                        <div class="grid grid-cols-2 gap-4">
-                            <select id="type" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                        
+                        <div class="space-y-4">
+                            <select id="type" onchange="window.handleTypeChange('add')" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
                                 <option value="link">🔗 Link Card</option>
                                 <option value="image">🖼️ Static Image</option>
                                 <option value="video">🎥 Motion Video</option>
                                 <option value="text">📝 Narrative Text</option>
                             </select>
-                            <!-- เพิ่มตัวเลือก Aspect Ratio -->
-                            <select id="add-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
-                                <option value="16/9">📐 16:9 (Standard)</option>
-                                <option value="1/1">📐 1:1 (Square)</option>
-                                <option value="9/16">📐 9:16 (Vertical)</option>
-                                <option value="4/3">📐 4:3 (Classic)</option>
-                            </select>
+                            
+                            <!-- Wrapper สำหรับซ่อน/แสดงช่อง Aspect Ratio -->
+                            <div id="add-ratio-wrapper" class="hidden">
+                                <label class="text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
+                                <select id="add-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest border-red-900/20 bg-red-900/5">
+                                    <option value="16/9">📐 16:9 (Standard)</option>
+                                    <option value="1/1">📐 1:1 (Square)</option>
+                                    <option value="9/16">📐 9:16 (Vertical)</option>
+                                    <option value="4/3">📐 4:3 (Classic)</option>
+                                </select>
+                            </div>
                         </div>
+                        
                         <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all hover:bg-red-900 hover:text-white text-center">Add to Sequence</button>
                     </form>
                 </div>
@@ -656,21 +677,27 @@
                 <input type="text" id="edit-title" required class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
                 <textarea id="edit-description" placeholder="Description" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
                 <input type="url" id="edit-url" class="w-full rounded-xl p-4 outline-none text-[10px] uppercase tracking-widest">
-                <div class="grid grid-cols-2 gap-4">
-                    <select id="edit-type" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
+                
+                <div class="space-y-4">
+                    <select id="edit-type" onchange="window.handleTypeChange('edit')" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
                         <option value="link">Link Card</option>
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="text">Narrative Text</option>
                     </select>
-                    <!-- ตัวเลือก Aspect Ratio ในหน้าแก้ไข -->
-                    <select id="edit-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest">
-                        <option value="16/9">16:9 (Standard)</option>
-                        <option value="1/1">1:1 (Square)</option>
-                        <option value="9/16">9:16 (Vertical)</option>
-                        <option value="4/3">4:3 (Classic)</option>
-                    </select>
+                    
+                    <!-- Wrapper สำหรับซ่อน/แสดงช่อง Aspect Ratio ในหน้าแก้ไข -->
+                    <div id="edit-ratio-wrapper" class="hidden">
+                        <label class="text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
+                        <select id="edit-ratio" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest border-red-900/20">
+                            <option value="16/9">16:9 (Standard)</option>
+                            <option value="1/1">1:1 (Square)</option>
+                            <option value="9/16">9:16 (Vertical)</option>
+                            <option value="4/3">4:3 (Classic)</option>
+                        </select>
+                    </div>
                 </div>
+
                 <select id="edit-status" class="w-full rounded-xl p-4 outline-none appearance-none text-[10px] uppercase tracking-widest mt-2 border-zinc-900">
                     <option value="show">🟢 PUBLIC</option>
                     <option value="hide">🔴 PRIVATE</option>
