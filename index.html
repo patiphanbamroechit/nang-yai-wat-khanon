@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (ยึดตำแหน่งจากพิกัดรูปจริง)
+        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (ปรับปรุงความแม่นยำสูง)
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -81,7 +81,7 @@
                 const targetRect = mainLogo.getBoundingClientRect();
                 const splashRect = splashLogo.getBoundingClientRect();
                 
-                // คำนวณระยะการเคลื่อนที่
+                // คำนวณระยะการเคลื่อนที่จากกึ่งกลางจอไปตำแหน่งเป้าหมาย
                 const deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
                 const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
                 const scale = targetRect.width / splashRect.width;
@@ -90,10 +90,11 @@
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    // 2. คำนวณตำแหน่งเส้นขาวจากพิกัดจริงของรูป (39.5%)
+                    // 2. คำนวณตำแหน่งเส้นขาวจากพิกัดจริงของรูป (39.5%) 
+                    // ยึดตามขอบซ้ายของตัวรูปภาพ (targetRect.left) เพื่อให้ตำแหน่งคงที่ทุกอุปกรณ์
                     const lineXPos = targetRect.left + (targetRect.width * 0.395);
 
-                    // ย้าย Overlay ไปจ่อที่เส้นทันที (ปิด transition ชั่วคราว)
+                    // ย้าย Overlay ไปจ่อที่เส้นทันทีโดยไม่มีอนิเมชั่น (กันอาการรูดจากกลางจอ)
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineXPos + 'px';
                     transitionOverlay.style.width = '3px';
@@ -107,7 +108,7 @@
                     transitionOverlay.style.height = "100vh"; 
                     
                     setTimeout(() => {
-                        // 3. ปาดออกข้างจนขาวทั้งจอ
+                        // 3. ขยายออกข้างจนขาวทั้งจอ
                         transitionOverlay.style.width = "100vw";
                         transitionOverlay.style.left = "50%"; // เลื่อนกลับมากลางเพื่อให้ปาดเต็มจอสมดุล
                         
@@ -272,7 +273,7 @@
                     `;
                 } else {
                     return `
-                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-900/50 p-7 rounded-3xl transition-all duration-500 hover:-translate-y-1 text-left mb-6 shadow-xl overflow-hidden">
+                        <a href="${link.url}" target="_blank" class="group relative block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-600/50 p-7 rounded-3xl transition-all duration-500 hover:-translate-y-1 text-left mb-6 shadow-xl overflow-hidden">
                             <div class="flex items-center space-x-5">
                                 <div class="w-10 h-10 flex items-center justify-center rounded-2xl bg-zinc-900/50 text-zinc-500 group-hover:text-red-500 transition-colors border border-zinc-800">
                                     <span class="text-xl">🔗</span>
@@ -432,7 +433,7 @@
             width: 100%;
         }
         
-        /* แสงฟุ้งสีแดง (Red Glow) - ปรับตำแหน่งให้อยู่กึ่งกลางเสมอและไม่ถูกกินขอบ */
+        /* แสงฟุ้งสีแดง (Red Glow) - ปรับปรุงความสมูทและความอ่อนโยน (Faded & Lighter) */
         body::before {
             content: "";
             position: absolute; 
@@ -440,9 +441,9 @@
             left: 50%; 
             transform: translateX(-50%);
             width: 100vw;
-            max-width: 1200px;
-            height: 600px; 
-            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.25) 0%, transparent 70%);
+            max-width: 1400px;
+            height: 700px; /* เพิ่มความสูงให้ระยะฟุ้งยาวขึ้น */
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.18) 0%, transparent 95%);
             pointer-events: none; 
             z-index: -1; 
         }
@@ -458,13 +459,13 @@
         }
         input:focus, textarea:focus, select:focus { border-color: #450a0a !important; }
 
-        /* Splash Screen Style - ป้องกัน Clipping บนมือถือ */
+        /* Splash Screen Style - ปรับขนาดโลโก้หดเข้ามาบนมือถือ (max-w-[70vw]) */
         #splash-screen { background-color: black; transition: opacity 1.2s ease-in-out; }
         #splash-logo {
             transition: all 1s cubic-bezier(0.65, 0, 0.35, 1);
             position: fixed; z-index: 10001;
             transform: translate(-50%, -50%) scale(1.1);
-            max-width: 90vw; /* ป้องกันโลโก้ใหญ่เกินหน้าจอมือถือ */
+            max-width: 70vw; /* หดขอบซ้ายขวาเข้ามามากขึ้นบนโทรศัพท์ */
             height: auto;
             filter: drop-shadow(0 0 30px rgba(153, 27, 27, 0.4));
         }
@@ -486,7 +487,7 @@
         }
 
         #app-content { opacity: 0; transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        #main-logo { opacity: 0; max-width: 90vw; }
+        #main-logo { opacity: 0; max-width: 80vw; } /* ป้องกันกินขอบบนหน้าหลักด้วย */
 
         @keyframes pulseLogo {
             0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(15px); }
@@ -553,7 +554,7 @@
     <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12 relative z-10 text-left">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
             <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
-            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-900 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
+            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
         </div>
         <div class="grid lg:grid-cols-5 gap-10 text-left">
             <div class="lg:col-span-2 text-left">
