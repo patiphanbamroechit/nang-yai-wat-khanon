@@ -66,7 +66,7 @@
             renderApp(); 
         });
 
-        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (พิกัด 39.5%)
+        // Cinematic Transition Logic - พุ่งออกมาจากเส้นขาวในรูปภาพ (ยึดตำแหน่งจากพิกัดรูปจริง)
         window.addEventListener('load', () => {
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -74,54 +74,55 @@
             const appContent = document.getElementById('app-content');
             const transitionOverlay = document.getElementById('transition-overlay');
             
-            // ล็อค Scrollbar
+            // ล็อค Scrollbar ไว้ตั้งแต่แรก
             document.body.style.overflow = 'hidden';
 
             setTimeout(() => {
                 const targetRect = mainLogo.getBoundingClientRect();
                 const splashRect = splashLogo.getBoundingClientRect();
                 
+                // คำนวณระยะการเคลื่อนที่
                 const deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
                 const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
                 const scale = targetRect.width / splashRect.width;
 
-                // 1. เลื่อนรูปเข้าตำแหน่ง
+                // 1. เลื่อนโลโก้เข้าหาตำแหน่งเป้าหมาย
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    // 2. คำนวณตำแหน่งพิกัดเส้นขาว 39.5%
-                    const lineOffsetRatio = 0.395; 
-                    const lineOffsetFromCenter = targetRect.width * (lineOffsetRatio - 0.5); 
-                    const lineGlobalX = (targetRect.left + targetRect.width / 2) + lineOffsetFromCenter;
+                    // 2. คำนวณตำแหน่งเส้นขาวจากพิกัดจริงของรูป (39.5%)
+                    const lineXPos = targetRect.left + (targetRect.width * 0.395);
 
+                    // ย้าย Overlay ไปจ่อที่เส้นทันที (ปิด transition ชั่วคราว)
                     transitionOverlay.style.transition = 'none';
-                    transitionOverlay.style.left = lineGlobalX + 'px';
-                    transitionOverlay.style.width = '4px';
+                    transitionOverlay.style.left = lineXPos + 'px';
+                    transitionOverlay.style.width = '3px';
                     transitionOverlay.style.height = '0';
                     
-                    void transitionOverlay.offsetWidth;
+                    void transitionOverlay.offsetWidth; // Force Reflow
 
+                    // เริ่มอนิเมชั่นขยายแนวตั้ง
                     transitionOverlay.style.transition = 'height 0.6s cubic-bezier(0.65, 0, 0.35, 1), width 0.6s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.5s ease, left 0.6s cubic-bezier(0.65, 0, 0.35, 1)';
                     transitionOverlay.style.opacity = "1";
                     transitionOverlay.style.height = "100vh"; 
                     
                     setTimeout(() => {
-                        // 3. ปาดออกข้าง
+                        // 3. ปาดออกข้างจนขาวทั้งจอ
                         transitionOverlay.style.width = "100vw";
-                        transitionOverlay.style.left = "50%"; 
+                        transitionOverlay.style.left = "50%"; // เลื่อนกลับมากลางเพื่อให้ปาดเต็มจอสมดุล
                         
                         setTimeout(() => {
-                            // 4. สลับหน้าจอ
+                            // 4. สลับหน้าจอภายใต้หน้ากากสีขาว
                             appContent.style.opacity = "1";
                             mainLogo.style.opacity = "1";
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
 
-                            // 5. จางออก
+                            // 5. จางความขาวออก
                             transitionOverlay.style.opacity = "0";
                             setTimeout(() => {
                                 transitionOverlay.style.display = 'none';
-                                document.body.style.overflow = 'auto'; 
+                                document.body.style.overflow = 'auto'; // คืนค่า Scrollbar เมื่อเสร็จสิ้น
                             }, 1000);
                         }, 700);
                     }, 500);
@@ -226,7 +227,7 @@
                 if (isInitialLoad) {
                     linksContainer.innerHTML = '<div class="animate-pulse space-y-10"><div class="h-48 bg-zinc-900 rounded-2xl opacity-10"></div></div>';
                 } else {
-                    linksContainer.innerHTML = '<p class="text-zinc-700 py-20 text-[11px] uppercase tracking-[0.2em] font-light">Gallery empty</p>';
+                    linksContainer.innerHTML = '<p class="text-zinc-700 py-20 text-[11px] uppercase tracking-[0.2em] font-light text-center">Gallery empty</p>';
                 }
                 return;
             }
@@ -431,17 +432,17 @@
             width: 100%;
         }
         
-        /* แสงฟุ้งสีแดง (Red Glow) - ปรับลดความเข้มลงเล็กน้อย (0.45 -> 0.3) */
+        /* แสงฟุ้งสีแดง (Red Glow) - ปรับตำแหน่งให้อยู่กึ่งกลางเสมอและไม่ถูกกินขอบ */
         body::before {
             content: "";
             position: absolute; 
             top: 0; 
             left: 50%; 
             transform: translateX(-50%);
-            width: 100%;
-            max-width: 1400px;
+            width: 100vw;
+            max-width: 1200px;
             height: 600px; 
-            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.3) 0%, transparent 75%);
+            background: radial-gradient(circle at 50% 0%, rgba(220, 38, 38, 0.25) 0%, transparent 70%);
             pointer-events: none; 
             z-index: -1; 
         }
@@ -457,12 +458,14 @@
         }
         input:focus, textarea:focus, select:focus { border-color: #450a0a !important; }
 
-        /* Splash Screen Style */
+        /* Splash Screen Style - ป้องกัน Clipping บนมือถือ */
         #splash-screen { background-color: black; transition: opacity 1.2s ease-in-out; }
         #splash-logo {
             transition: all 1s cubic-bezier(0.65, 0, 0.35, 1);
             position: fixed; z-index: 10001;
             transform: translate(-50%, -50%) scale(1.1);
+            max-width: 90vw; /* ป้องกันโลโก้ใหญ่เกินหน้าจอมือถือ */
+            height: auto;
             filter: drop-shadow(0 0 30px rgba(153, 27, 27, 0.4));
         }
 
@@ -483,7 +486,7 @@
         }
 
         #app-content { opacity: 0; transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        #main-logo { opacity: 0; }
+        #main-logo { opacity: 0; max-width: 90vw; }
 
         @keyframes pulseLogo {
             0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(15px); }
@@ -506,7 +509,7 @@
     <div id="app-content" class="relative z-10">
         <div id="viewer-page" class="min-h-screen flex flex-col items-center justify-start p-6 transition-all">
             <div class="max-w-4xl w-full flex flex-col items-center text-center mt-12 md:mt-24">
-                <!-- Main Logo - ขนาดใหญ่ 24-36 -->
+                <!-- Main Logo -->
                 <img id="main-logo" src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-24 md:max-h-36 w-auto object-contain mb-10 transition-opacity duration-500">
                 
                 <div class="w-full max-w-[580px] px-4">
@@ -529,7 +532,7 @@
         <div id="maintenance-page" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-center">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mb-12 opacity-10 grayscale object-contain">
             <h2 class="text-red-900 text-xl font-bold uppercase tracking-[0.4em] mb-4 text-center">Under Maintenance</h2>
-            <p class="text-zinc-800 text-[9px] max-w-xs mx-auto leading-relaxed text-center uppercase tracking-widest font-light">The digital gallery is currently being curated. <br> Please return later.</p>
+            <p class="text-zinc-800 text-[9px] max-w-xs mx-auto leading-relaxed text-center uppercase tracking-widest font-light text-center w-full block">The digital gallery is currently being curated. <br> Please return later.</p>
             <footer class="mt-32"><a href="#admin" class="text-[7px] text-zinc-900 uppercase tracking-[0.6em] hover:text-zinc-800">Staff Access</a></footer>
         </div>
     </div>
@@ -550,7 +553,7 @@
     <div id="admin-page" class="hidden max-w-6xl mx-auto px-6 py-12 relative z-10 text-left">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-zinc-900 pb-8 text-left">
             <div><h1 class="text-2xl font-bold text-red-900 tracking-tighter uppercase text-left">Curator Studio</h1><p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p></div>
-            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
+            <div class="flex items-center gap-4"><button id="site-status-toggle" onclick="window.toggleSiteStatus()" class="px-4 py-2 border border-zinc-900 rounded-xl transition-all shadow-lg"></button><button onclick="window.logoutAdmin()" class="bg-black border border-zinc-900 text-zinc-600 hover:text-white px-5 py-2 rounded-xl text-[9px] uppercase tracking-widest transition-all">Sign Out</button></div>
         </div>
         <div class="grid lg:grid-cols-5 gap-10 text-left">
             <div class="lg:col-span-2 text-left">
@@ -609,9 +612,9 @@
         </div>
     </div>
     <div id="custom-confirm" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4">
-        <div class="bg-zinc-900/50 border border-zinc-900 p-12 rounded-[4rem] max-w-sm w-full text-center backdrop-blur-xl">
+        <div class="bg-zinc-900/50 border border-zinc-900 p-12 rounded-[4rem] max-w-sm w-full text-center backdrop-blur-xl text-center">
             <h3 class="text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900 text-center">Unregister Item?</h3>
-            <p class="text-zinc-600 text-[9px] mb-12 uppercase font-light tracking-[0.2em] text-center">Permanent removal from sequence</p>
+            <p class="text-zinc-600 text-[9px] mb-12 uppercase font-light tracking-[0.2em] text-center w-full block">Permanent removal from sequence</p>
             <div class="grid grid-cols-2 gap-4 text-center">
                 <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-red-900 hover:text-white transition-all">Delete</button>
                 <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-900 text-zinc-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
