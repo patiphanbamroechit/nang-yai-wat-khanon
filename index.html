@@ -8,12 +8,15 @@
     <link rel="icon" type="image/png" href="https://img5.pic.in.th/file/secure-sv1/LOGO46a10e1dd4b0ec16.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SortableJS สำหรับระบบลากวาง -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -233,43 +236,60 @@
             adminLinksContainer.innerHTML = links.map((link, index) => {
                 const isHidden = link.status === 'hide';
                 return `
-                <div class="bg-zinc-900 border ${isHidden ? 'border-zinc-800/50 opacity-50' : 'border-zinc-800'} p-4 rounded-xl mb-3 flex items-center justify-between group transition-all">
-                    <div class="flex-1 min-w-0 mr-4 text-left">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="text-[9px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
-                            <h3 class="text-white text-sm font-bold truncate">${link.title}</h3>
-                            ${isHidden ? '<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-500 border border-red-900/50 font-bold uppercase ml-1">HIDDEN</span>' : ''}
+                <div data-id="${link.id}" class="bg-zinc-900 border ${isHidden ? 'border-zinc-800/50 opacity-50' : 'border-zinc-800'} p-4 rounded-xl mb-3 flex items-center justify-between group transition-all cursor-grab active:cursor-grabbing">
+                    <div class="flex items-center mr-4">
+                        <span class="text-zinc-700 mr-3 select-none">☰</span>
+                        <div class="flex-1 min-w-0 text-left">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[9px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 uppercase font-bold tracking-tighter">${link.type}</span>
+                                <h3 class="text-white text-sm font-bold truncate">${link.title}</h3>
+                                ${isHidden ? '<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-500 border border-red-900/50 font-bold uppercase ml-1">HIDDEN</span>' : ''}
+                            </div>
+                            <p class="text-[10px] text-zinc-600 truncate max-w-[200px]">${link.description || link.url || '-'}</p>
                         </div>
-                        <p class="text-[10px] text-zinc-600 truncate">${link.description || link.url || '-'}</p>
                     </div>
                     <div class="flex items-center gap-1">
                         <button onclick="window.toggleStatus('${link.id}', '${link.status || 'show'}')" class="p-2 ${isHidden ? 'bg-zinc-800 text-zinc-500' : 'bg-green-600/10 text-green-500'} rounded-lg hover:bg-zinc-700 transition-colors">
                             ${isHidden ? '👁️‍🗨️' : '👁️'}
                         </button>
-                        <button onclick="window.moveItem(${index}, -1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors" ${index === 0 ? 'disabled opacity-20' : ''}>▲</button>
-                        <button onclick="window.moveItem(${index}, 1)" class="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors" ${index === links.length - 1 ? 'disabled opacity-20' : ''}>▼</button>
-                        <button onclick="window.openEditModal('${link.id}')" class="px-3 py-2 bg-blue-600/10 text-blue-500 rounded-lg text-[10px] font-bold">EDIT</button>
-                        <button onclick="window.deleteLink('${link.id}')" class="px-3 py-2 bg-red-600/10 text-red-500 rounded-lg text-[10px] font-bold ml-1">DEL</button>
+                        <button onclick="window.openEditModal('${link.id}')" class="px-3 py-2 bg-blue-600/10 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-bold">EDIT</button>
+                        <button onclick="window.deleteLink('${link.id}')" class="px-3 py-2 bg-red-600/10 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[10px] font-bold ml-1">DEL</button>
                     </div>
                 </div>
             `}).join('');
+
+            // เริ่มต้นระบบ Drag-and-Drop
+            initSortable();
+        };
+
+        const initSortable = () => {
+            if (window.sortableInstance) window.sortableInstance.destroy();
+            window.sortableInstance = new Sortable(adminLinksContainer, {
+                animation: 150,
+                ghostClass: 'bg-red-900/10',
+                onEnd: async function () {
+                    const items = Array.from(adminLinksContainer.children);
+                    const newOrderIds = items.map(el => el.getAttribute('data-id'));
+                    
+                    // อัปเดตลำดับใน Firestore
+                    try {
+                        for (let i = 0; i < newOrderIds.length; i++) {
+                            const id = newOrderIds[i];
+                            // ใช้ timestamp + index เพื่อให้ลำดับถูกต้องเสมอ
+                            const newOrderValue = Date.now() - (newOrderIds.length - i) * 1000;
+                            await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), {
+                                order: newOrderValue
+                            });
+                        }
+                    } catch (err) { console.error("Reorder error:", err); }
+                }
+            });
         };
 
         window.toggleStatus = async (id, currentStatus) => {
             const newStatus = currentStatus === 'hide' ? 'show' : 'hide';
             try {
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), { status: newStatus });
-            } catch (err) { console.error(err); }
-        };
-
-        window.moveItem = async (index, direction) => {
-            const targetIndex = index + direction;
-            if (targetIndex < 0 || targetIndex >= links.length) return;
-            const itemA = links[index], itemB = links[targetIndex];
-            const orderA = itemA.order ?? itemA.createdAt ?? 0, orderB = itemB.order ?? itemB.createdAt ?? 0;
-            try {
-                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', itemA.id), { order: orderB });
-                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', itemB.id), { order: orderA });
             } catch (err) { console.error(err); }
         };
 
@@ -400,7 +420,7 @@
                 <div class="w-[80px] h-[3px] bg-red-600 rounded-full opacity-60 shadow-[0_0_15px_rgba(220,38,38,0.3)]"></div>
             </div>
             <div id="links-container" class="space-y-12 max-w-[500px] w-full mx-auto pb-4">
-                <div class="animate-pulse space-y-10"><div class="h-48 bg-zinc-900 rounded-2xl opacity-20"></div></div>
+                <div class="animate-pulse space-y-10"><div class="h-48 bg-zinc-900 rounded-2xl border border-zinc-800 opacity-20"></div></div>
             </div>
             <footer class="w-full py-10">
                 <a href="#admin" class="text-zinc-900 hover:text-zinc-700 text-[9px] tracking-[0.4em] uppercase transition-colors font-light">Administrator</a>
@@ -408,7 +428,7 @@
         </div>
     </div>
 
-    <!-- MAINTENANCE PAGE (ปรับพื้นหลังให้มืดสนิท ไม่ย้อมสี) -->
+    <!-- MAINTENANCE PAGE -->
     <div id="maintenance-page" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-center">
         <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-24 md:max-h-32 mb-10 opacity-30 object-contain w-auto">
         <h2 class="text-red-600 text-xl md:text-2xl font-bold uppercase tracking-[0.3em] mb-4 text-center">Under Maintenance</h2>
@@ -426,7 +446,10 @@
         <div class="max-w-sm w-full bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] text-center shadow-2xl">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mx-auto mb-8 object-contain opacity-80 block">
             <h2 class="text-xl font-bold mb-8 tracking-widest uppercase text-red-600 border-t border-zinc-800 pt-8 text-center">Admin Key</h2>
-            <input type="password" id="admin-password-input" placeholder="Password" class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl tracking-widest">
+            <input type="password" id="admin-password-input" placeholder="Password" 
+                class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl tracking-widest"
+                onkeydown="if(event.key === 'Enter') window.checkAdminPassword()">
+            <p id="login-error" class="text-red-500 text-[10px] mb-4 hidden uppercase tracking-widest">Wrong Password</p>
             <button onclick="window.checkAdminPassword()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Login</button>
             <a href="#" class="inline-block mt-8 text-zinc-600 hover:text-white text-[10px] uppercase tracking-widest">← Exit</a>
         </div>
@@ -467,7 +490,8 @@
             </div>
             <div class="lg:col-span-3 text-left">
                 <div class="bg-zinc-900/20 p-8 rounded-[3rem] border border-zinc-800">
-                    <h2 class="text-sm font-bold mb-10 uppercase tracking-widest text-zinc-400 text-left">Live Sequence</h2>
+                    <h2 class="text-sm font-bold mb-4 uppercase tracking-widest text-zinc-400 text-left">Live Sequence</h2>
+                    <p class="text-[9px] text-zinc-600 mb-6 uppercase tracking-widest">💡 จับลากที่ไอคอน ☰ เพื่อเปลี่ยนลำดับ</p>
                     <div id="admin-links-container" class="space-y-2 custom-scrollbar"></div>
                 </div>
             </div>
@@ -504,7 +528,7 @@
     <!-- Confirm Delete Modal -->
     <div id="custom-confirm" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
         <div class="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] max-w-sm w-full text-center">
-            <h3 class="text-lg font-bold mb-4 uppercase tracking-widest text-red-600">Delete Exhibit?</h3>
+            <h3 class="text-lg font-bold mb-4 uppercase tracking-widest text-red-600 text-center">Delete Exhibit?</h3>
             <p class="text-zinc-500 text-[10px] mb-12 uppercase font-light text-center">ข้อมูลจะถูกลบถาวร</p>
             <div class="grid grid-cols-2 gap-4">
                 <button onclick="window.confirmDeleteAction()" class="bg-red-600 py-3 rounded-2xl font-bold uppercase tracking-widest text-[10px]">Delete</button>
