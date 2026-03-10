@@ -40,6 +40,7 @@
         let siteStatus = 'open'; 
         let isInitialLoad = true; 
         let isAdminAuthorized = sessionStorage.getItem('isAdminAuthorized') === 'true';
+        let isGlobalMuted = true; // สถานะเสียงเริ่มต้น (เบราว์เซอร์บังคับ Mute สำหรับ Autoplay)
         const ADMIN_PASSWORD = "Pluk65030138";
 
         const viewerPage = document.getElementById('viewer-page');
@@ -78,6 +79,7 @@
             const mainLogo = document.getElementById('main-logo');
             const appContent = document.getElementById('app-content');
             const transitionOverlay = document.getElementById('transition-overlay');
+            const soundPrompt = document.getElementById('sound-prompt');
             
             document.documentElement.style.overflow = 'hidden';
             document.body.style.overflow = 'hidden';
@@ -126,6 +128,11 @@
                                 document.body.style.overflowY = 'auto'; 
                                 document.body.style.overflowX = 'hidden';
                                 window.scrollTo(0, 0);
+
+                                // แสดง Popup ขอเปิดเสียงหลังจาก Transition จบ
+                                if (siteStatus === 'open' && !window.location.hash.includes('admin')) {
+                                    soundPrompt.classList.remove('translate-y-20', 'opacity-0');
+                                }
                             }, 1200);
                         }, 800);
                     }, 600);
@@ -166,6 +173,27 @@
             } catch (err) { console.error(err); }
         };
 
+        // ฟังก์ชันจัดการเสียง
+        window.toggleGlobalSound = () => {
+            isGlobalMuted = !isGlobalMuted;
+            const soundBtn = document.getElementById('global-sound-btn');
+            const soundPrompt = document.getElementById('sound-prompt');
+            
+            // อัปเดต UI ปุ่ม
+            soundBtn.innerHTML = isGlobalMuted ? '🔇' : '🔊';
+            soundBtn.classList.toggle('bg-red-900/20', isGlobalMuted);
+            soundBtn.classList.toggle('border-red-900/50', isGlobalMuted);
+            soundBtn.classList.toggle('bg-green-900/20', !isGlobalMuted);
+            soundBtn.classList.toggle('border-green-900/50', !isGlobalMuted);
+
+            // ซ่อน Popup
+            soundPrompt.classList.add('opacity-0', 'translate-y-20');
+            setTimeout(() => soundPrompt.style.display = 'none', 500);
+
+            // โหลดวิดีโอใหม่พร้อมเสียง
+            renderViewerLinks();
+        };
+
         window.checkAdminPassword = () => {
             const passInput = document.getElementById('admin-password-input');
             if (passInput.value === ADMIN_PASSWORD) {
@@ -183,8 +211,10 @@
             pages.forEach(p => p.classList.add('hidden'));
 
             const hash = window.location.hash;
+            const soundControls = document.getElementById('global-sound-controls');
             
             if (hash === '#admin') {
+                soundControls.classList.add('hidden');
                 if (isAdminAuthorized) {
                     adminPage.classList.remove('hidden');
                     loadLinks(true);
@@ -194,8 +224,10 @@
             } else {
                 if (siteStatus === 'closed') {
                     maintenancePage.classList.remove('hidden');
+                    soundControls.classList.add('hidden');
                 } else {
                     viewerPage.classList.remove('hidden');
+                    soundControls.classList.remove('hidden');
                     loadLinks(false);
                 }
             }
@@ -220,7 +252,11 @@
             if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
-            if (match && match[2].length === 11) return `https://www.youtube.com/embed/${match[2]}`;
+            if (match && match[2].length === 11) {
+                // เปลี่ยนค่า mute ตามสถานะ global (1 = ปิดเสียง, 0 = เปิดเสียง)
+                const muteParam = isGlobalMuted ? 1 : 0;
+                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1`;
+            }
             return null;
         };
 
@@ -242,7 +278,7 @@
                 if (link.type === 'image') {
                     return `
                         <div class="reveal-item w-full mb-14 text-left" style="animation-delay: ${delay}s">
-                            <h3 class="text-white text-[11px] font-medium opacity-60 uppercase tracking-wider">${link.title}</h3>
+                            <h3 class="text-white text-[10px] md:text-[11px] font-medium opacity-60 uppercase tracking-wider">${link.title}</h3>
                             <div class="relative overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl mt-4 bg-zinc-900/10">
                                 <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-contain block mx-auto" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
                             </div>
@@ -254,10 +290,10 @@
                     const ratio = link.ratio || '16/9';
                     return `
                         <div class="reveal-item w-full mb-14 text-left" style="animation-delay: ${delay}s">
-                            <h3 class="text-white text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
+                            <h3 class="text-white text-[9px] md:text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
                             <div class="relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-4 shadow-2xl" style="aspect-ratio: ${ratio}">
                                 ${embedUrl ? 
-                                    `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>` : 
+                                    `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>` : 
                                     `<div class="flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center">
                                         <span class="text-3xl mb-2">🎥</span>
                                         <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full">Watch on YouTube</a>
@@ -271,7 +307,7 @@
                     return `
                         <div class="reveal-item w-full mb-14 text-left p-8 rounded-3xl border border-zinc-800 bg-zinc-900/10 relative overflow-hidden shadow-lg" style="animation-delay: ${delay}s">
                             <div class="absolute top-0 left-0 w-1 h-full bg-red-900/50"></div>
-                            <h3 class="text-red-600 text-[11px] font-bold uppercase tracking-[0.2em] border-b border-zinc-900/50 pb-4 mb-4">${link.title}</h3>
+                            <h3 class="text-red-600 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] border-b border-zinc-900/50 pb-4 mb-4">${link.title}</h3>
                             <p class="text-zinc-300 text-xs md:text-sm leading-relaxed whitespace-pre-wrap font-light">${link.description || '-'}</p>
                         </div>
                     `;
@@ -304,7 +340,6 @@
                 return `
                 <div data-id="${link.id}" class="bg-zinc-900/40 border ${isHidden ? 'border-zinc-800/30 opacity-40' : 'border-zinc-800'} p-2 md:p-4 rounded-2xl mb-3 flex items-center justify-between group transition-all text-left">
                     <div class="flex items-center mr-2 md:mr-4 min-w-0 flex-1">
-                        <!-- Strict Drag Handle - เพิ่ม padding ให้กดง่ายขึ้น -->
                         <span class="drag-handle text-zinc-800 mr-2 md:mr-4 select-none cursor-grab active:cursor-grabbing p-3 md:p-2 -m-2 md:-m-1 text-sm md:text-base">☰</span>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-1 md:gap-2 mb-0.5">
@@ -332,7 +367,7 @@
             window.sortableInstance = new Sortable(adminLinksContainer, {
                 animation: 150,
                 ghostClass: 'bg-red-900/5',
-                handle: '.drag-handle', // กำหนดให้ลากได้จากเฉพาะจุด ☰ เท่านั้น
+                handle: '.drag-handle',
                 onEnd: async function () {
                     const items = Array.from(adminLinksContainer.children);
                     const newOrderIds = items.map(el => el.getAttribute('data-id'));
@@ -547,6 +582,11 @@
             opacity: 0;
             animation: fadeInUp 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
+
+        /* Sound UI Styles */
+        #sound-prompt {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
     </style>
 </head>
 <body class="min-h-screen custom-scrollbar">
@@ -558,6 +598,19 @@
 
     <!-- WHITE TRANSITION OVERLAY -->
     <div id="transition-overlay"></div>
+
+    <!-- SOUND CONTROLS (Floating) -->
+    <div id="global-sound-controls" class="hidden fixed bottom-6 right-6 z-[2000] flex flex-col items-end gap-3 pointer-events-none">
+        <!-- Sound Prompt Toast -->
+        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-20 bg-zinc-900/90 border border-zinc-800 p-3 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3">
+            <p class="text-[9px] uppercase tracking-widest text-zinc-400 pl-2">ต้องการเปิดเสียงหรือไม่?</p>
+            <button onclick="window.toggleGlobalSound()" class="bg-red-900/80 hover:bg-red-600 text-white text-[8px] font-bold py-1.5 px-3 rounded-xl transition-all uppercase tracking-tighter">เปิดเสียง</button>
+        </div>
+        <!-- Toggle Button -->
+        <button id="global-sound-btn" onclick="window.toggleGlobalSound()" class="pointer-events-auto w-12 h-12 flex items-center justify-center rounded-full bg-red-900/20 border border-red-900/50 text-xl shadow-2xl backdrop-blur-lg hover:scale-110 active:scale-95 transition-all">
+            🔇
+        </button>
+    </div>
 
     <!-- MAIN APP CONTENT -->
     <div id="app-content">
@@ -634,7 +687,7 @@
             <div class="lg:col-span-2 w-full min-w-0">
                 <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 lg:sticky lg:top-10 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
                     <h2 class="text-[10px] md:text-xs font-bold mb-6 md:mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
-                        <span class="w-1 h-3 bg-red-900 mr-3 rounded-full"></span> New exhibit
+                        <span class="w-1 h-3 bg-red-900 mr-3 rounded-full text-left"></span> New exhibit
                     </h2>
                     <form id="add-link-form" class="space-y-4 w-full">
                         <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
