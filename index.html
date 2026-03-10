@@ -10,6 +10,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SortableJS สำหรับระบบลากวาง -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -40,7 +42,7 @@
         let siteStatus = 'open'; 
         let isInitialLoad = true; 
         let isAdminAuthorized = sessionStorage.getItem('isAdminAuthorized') === 'true';
-        let isGlobalMuted = true; // สถานะเสียงเริ่มต้น (เบราว์เซอร์บังคับ Mute สำหรับ Autoplay)
+        let isGlobalMuted = true; 
         const ADMIN_PASSWORD = "Pluk65030138";
 
         const viewerPage = document.getElementById('viewer-page');
@@ -73,6 +75,9 @@
                 history.scrollRestoration = 'manual';
             }
             window.scrollTo(0, 0);
+
+            // Initialize Lucide Icons
+            lucide.createIcons();
 
             const splash = document.getElementById('splash-screen');
             const splashLogo = document.getElementById('splash-logo');
@@ -129,7 +134,6 @@
                                 document.body.style.overflowX = 'hidden';
                                 window.scrollTo(0, 0);
 
-                                // แสดง Popup ขอเปิดเสียงหลังจาก Transition จบ
                                 if (siteStatus === 'open' && !window.location.hash.includes('admin')) {
                                     soundPrompt.classList.remove('translate-y-20', 'opacity-0');
                                 }
@@ -164,33 +168,26 @@
             }
         };
 
-        window.toggleSiteStatus = async () => {
-            const newStatus = siteStatus === 'open' ? 'closed' : 'open';
-            try {
-                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'settings', 'site_config'), {
-                    status: newStatus
-                });
-            } catch (err) { console.error(err); }
-        };
-
-        // ฟังก์ชันจัดการเสียง
         window.toggleGlobalSound = () => {
             isGlobalMuted = !isGlobalMuted;
             const soundBtn = document.getElementById('global-sound-btn');
             const soundPrompt = document.getElementById('sound-prompt');
             
-            // อัปเดต UI ปุ่ม
-            soundBtn.innerHTML = isGlobalMuted ? '🔇' : '🔊';
-            soundBtn.classList.toggle('bg-red-900/20', isGlobalMuted);
-            soundBtn.classList.toggle('border-red-900/50', isGlobalMuted);
-            soundBtn.classList.toggle('bg-green-900/20', !isGlobalMuted);
-            soundBtn.classList.toggle('border-green-900/50', !isGlobalMuted);
+            // อัปเดตไอคอนด้วย Lucide
+            soundBtn.innerHTML = isGlobalMuted ? 
+                '<i data-lucide="volume-x" class="w-5 h-5 text-red-500"></i>' : 
+                '<i data-lucide="volume-2" class="w-5 h-5 text-green-500"></i>';
+            
+            lucide.createIcons();
+            
+            soundBtn.classList.toggle('bg-red-900/10', isGlobalMuted);
+            soundBtn.classList.toggle('border-red-900/30', isGlobalMuted);
+            soundBtn.classList.toggle('bg-green-900/10', !isGlobalMuted);
+            soundBtn.classList.toggle('border-green-900/30', !isGlobalMuted);
 
-            // ซ่อน Popup
             soundPrompt.classList.add('opacity-0', 'translate-y-20');
             setTimeout(() => soundPrompt.style.display = 'none', 500);
 
-            // โหลดวิดีโอใหม่พร้อมเสียง
             renderViewerLinks();
         };
 
@@ -253,9 +250,9 @@
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) {
-                // เปลี่ยนค่า mute ตามสถานะ global (1 = ปิดเสียง, 0 = เปิดเสียง)
                 const muteParam = isGlobalMuted ? 1 : 0;
-                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1`;
+                const origin = window.location.origin;
+                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}`;
             }
             return null;
         };
@@ -293,9 +290,9 @@
                             <h3 class="text-white text-[9px] md:text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
                             <div class="relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-4 shadow-2xl" style="aspect-ratio: ${ratio}">
                                 ${embedUrl ? 
-                                    `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>` : 
+                                    `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>` : 
                                     `<div class="flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center">
-                                        <span class="text-3xl mb-2">🎥</span>
+                                        <i data-lucide="video-off" class="w-8 h-8 mb-2 opacity-30"></i>
                                         <a href="${link.url}" target="_blank" class="text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full">Watch on YouTube</a>
                                     </div>`
                                 }
@@ -316,18 +313,20 @@
                         <a href="${link.url}" target="_blank" class="reveal-item group relative block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-600/50 p-7 rounded-3xl transition-all duration-500 hover:-translate-y-1 text-left mb-6 shadow-xl overflow-hidden" style="animation-delay: ${delay}s">
                             <div class="flex items-center space-x-5">
                                 <div class="w-10 h-10 flex items-center justify-center rounded-2xl bg-zinc-900/50 text-zinc-500 group-hover:text-red-500 transition-colors border border-zinc-800">
-                                    <span class="text-xl">🔗</span>
+                                    <i data-lucide="link" class="w-5 h-5"></i>
                                 </div>
                                 <div class="flex-1 overflow-hidden">
                                     <h3 class="text-white text-xs md:text-sm truncate font-medium">${link.title}</h3>
                                     ${link.description ? `<p class="text-zinc-600 text-[9px] mt-1 truncate">${link.description}</p>` : `<p class="text-zinc-700 text-[9px] truncate mt-1 font-light opacity-50">${link.url}</p>`}
                                 </div>
-                                <span class="text-red-900 group-hover:text-red-600 transition-colors font-bold text-xl">→</span>
+                                <i data-lucide="chevron-right" class="text-red-900 group-hover:text-red-600 transition-all w-5 h-5"></i>
                             </div>
                         </a>
                     `;
                 }
             }).join('');
+            
+            lucide.createIcons();
         };
 
         const renderAdminLinks = () => {
@@ -351,15 +350,16 @@
                     </div>
                     <div class="flex items-center gap-1 shrink-0 ml-1">
                         <button onclick="window.toggleStatus('${link.id}', '${link.status || 'show'}')" class="p-1.5 md:p-2 ${isHidden ? 'text-zinc-600' : 'text-green-900'} rounded-lg hover:bg-white/5 transition-colors">
-                            ${isHidden ? '👁️‍🗨️' : '👁️'}
+                            <i data-lucide="${isHidden ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="window.openEditModal('${link.id}')" class="px-2 md:px-3 py-1.5 md:py-2 bg-blue-900/10 text-blue-700 rounded-xl text-[8px] md:text-[9px] font-bold">EDIT</button>
-                        <button onclick="window.deleteLink('${link.id}')" class="px-2 md:px-3 py-1.5 md:py-2 bg-red-900/10 text-red-900 rounded-xl text-[8px] md:text-[9px] font-bold">DEL</button>
+                        <button onclick="window.openEditModal('${link.id}')" class="px-2 md:px-3 py-1.5 md:py-2 bg-blue-900/10 text-blue-700 rounded-xl text-[8px] md:text-[9px] font-bold uppercase">Edit</button>
+                        <button onclick="window.deleteLink('${link.id}')" class="px-2 md:px-3 py-1.5 md:py-2 bg-red-900/10 text-red-900 rounded-xl text-[8px] md:text-[9px] font-bold uppercase">Del</button>
                     </div>
                 </div>
             `}).join('');
 
             initSortable();
+            lucide.createIcons();
         };
 
         const initSortable = () => {
@@ -489,12 +489,12 @@
             margin: 0;
             padding: 0;
             max-width: 100%;
+            background-color: #000;
         }
 
         body { 
             font-family: 'SaoChingcha', sans-serif; 
             color: #fff; 
-            background-color: #000;
         }
         
         body::before {
@@ -583,9 +583,15 @@
             animation: fadeInUp 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
-        /* Sound UI Styles */
         #sound-prompt {
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        
+        .glass-panel {
+            background: rgba(15, 15, 15, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
     </style>
 </head>
@@ -600,15 +606,21 @@
     <div id="transition-overlay"></div>
 
     <!-- SOUND CONTROLS (Floating) -->
-    <div id="global-sound-controls" class="hidden fixed bottom-6 right-6 z-[2000] flex flex-col items-end gap-3 pointer-events-none">
+    <div id="global-sound-controls" class="hidden fixed bottom-8 right-6 z-[2000] flex flex-col items-end gap-4 pointer-events-none">
         <!-- Sound Prompt Toast -->
-        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-20 bg-zinc-900/90 border border-zinc-800 p-3 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3">
-            <p class="text-[9px] uppercase tracking-widest text-zinc-400 pl-2">ต้องการเปิดเสียงหรือไม่?</p>
-            <button onclick="window.toggleGlobalSound()" class="bg-red-900/80 hover:bg-red-600 text-white text-[8px] font-bold py-1.5 px-3 rounded-xl transition-all uppercase tracking-tighter">เปิดเสียง</button>
+        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-20 glass-panel p-4 rounded-3xl shadow-2xl flex items-center gap-4">
+            <div class="w-8 h-8 rounded-full bg-red-900/20 flex items-center justify-center">
+                <i data-lucide="volume-2" class="w-4 h-4 text-red-500"></i>
+            </div>
+            <div class="flex flex-col">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-white leading-none">ต้องการเปิดเสียงหรือไม่?</p>
+                <p class="text-[8px] uppercase tracking-wider text-zinc-500 mt-1">แตะเพื่อรับชมพร้อมเสียง</p>
+            </div>
+            <button onclick="window.toggleGlobalSound()" class="bg-red-600 hover:bg-red-500 text-white text-[9px] font-bold py-2 px-4 rounded-2xl transition-all uppercase tracking-widest ml-2 shadow-lg shadow-red-900/20">เปิดเสียง</button>
         </div>
         <!-- Toggle Button -->
-        <button id="global-sound-btn" onclick="window.toggleGlobalSound()" class="pointer-events-auto w-12 h-12 flex items-center justify-center rounded-full bg-red-900/20 border border-red-900/50 text-xl shadow-2xl backdrop-blur-lg hover:scale-110 active:scale-95 transition-all">
-            🔇
+        <button id="global-sound-btn" onclick="window.toggleGlobalSound()" class="pointer-events-auto w-14 h-14 flex items-center justify-center rounded-full glass-panel border border-white/10 shadow-2xl hover:scale-110 active:scale-95 transition-all">
+            <i data-lucide="volume-x" class="w-5 h-5 text-red-500"></i>
         </button>
     </div>
 
@@ -683,7 +695,6 @@
         </div>
         
         <div class="grid lg:grid-cols-5 gap-6 md:gap-10 text-left w-full max-w-6xl mx-auto">
-            <!-- Add Form -->
             <div class="lg:col-span-2 w-full min-w-0">
                 <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 lg:sticky lg:top-10 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
                     <h2 class="text-[10px] md:text-xs font-bold mb-6 md:mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
@@ -718,7 +729,6 @@
                 </div>
             </div>
             
-            <!-- Items List -->
             <div class="lg:col-span-3 w-full min-w-0">
                 <div class="bg-zinc-900/5 p-4 md:p-8 rounded-3xl md:rounded-[3rem] border border-zinc-900 w-full box-border overflow-hidden">
                     <h2 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700">Active Sequence</h2>
