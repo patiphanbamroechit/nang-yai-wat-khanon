@@ -463,6 +463,16 @@
             window.showToast('คัดลอกลิงก์เรียบร้อยแล้ว', 'copy');
         };
 
+        // ฟังก์ชันช่วยแปลงข้อความที่มี URL ให้เป็นแท็กลิงก์
+        const linkify = (text) => {
+            if (!text) return '';
+            // ค้นหาข้อความที่ขึ้นต้นด้วย http:// หรือ https://
+            const urlRegex = /(https?:\/\/[^\s<]+)/g;
+            return text.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-red-500 hover:text-red-400 underline transition-colors" onclick="event.stopPropagation()">${url}</a>`;
+            });
+        };
+
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
             const hasVideo = visibleLinks.some(link => link.type === 'video');
@@ -489,7 +499,8 @@
 
             linksContainer.innerHTML = visibleLinks.map((link, index) => {
                 const delay = (index * 0.15) + 0.5;
-                const descHtml = link.description ? `<p class=\"text-zinc-500 text-[10px] md:text-xs mt-3 leading-relaxed whitespace-pre-wrap text-left font-light\">${link.description}</p>` : '';
+                // นำ link.description ไปผ่านฟังก์ชัน linkify ก่อนแสดงผล
+                const descHtml = link.description ? `<p class=\"text-zinc-500 text-[10px] md:text-xs mt-3 leading-relaxed whitespace-pre-wrap text-left font-light\">${linkify(link.description)}</p>` : '';
                 
                 const safeTitle = (link.title || '').replace(/'/g, "\\'");
                 const shareBtnHtml = `<button onclick=\"window.shareContent('${link.url || ''}', '${safeTitle}')\" class=\"text-zinc-600 hover:text-red-500 transition-colors p-1 bg-zinc-900/50 rounded-lg border border-zinc-800\" title=\"แชร์\"><i data-lucide=\"share-2\" class=\"w-3.5 h-3.5\"></i></button>`;
@@ -539,7 +550,7 @@
                                 <h3 class=\"text-red-600 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em]\">${link.title}</h3>
                                 ${shareBtnHtml}
                             </div>
-                            <p class=\"text-zinc-300 text-xs md:text-sm leading-relaxed whitespace-pre-wrap font-light\">${link.description || '-'}</p>
+                            <p class=\"text-zinc-300 text-xs md:text-sm leading-relaxed whitespace-pre-wrap font-light\">${linkify(link.description) || '-'}</p>
                         </div>
                     `;
                 } else {
