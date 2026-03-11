@@ -18,7 +18,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // เพิ่ม increment และ arrayUnion สำหรับระบบ Analytics
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, writeBatch, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -45,6 +46,10 @@
         let isGlobalMuted = true; 
         const ADMIN_PASSWORD = "Pluk65030138";
 
+        // Analytics Listeners State
+        let analyticsListenerUnsubscribe = null;
+        let logsListenerUnsubscribe = null;
+
         const viewerPage = document.getElementById('viewer-page');
         const adminPage = document.getElementById('admin-page');
         const adminLoginPage = document.getElementById('admin-login-page');
@@ -66,8 +71,101 @@
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             loadSiteConfig(); 
+            setupAnalyticsListeners();
             renderApp(); 
         });
+
+        // ระบบบันทึกยอดผู้เข้าชม (Auto View Tracking)
+        const recordVisit = async () => {
+            if (!currentUser || isAdminAuthorized || sessionStorage.getItem('visited_logged') === 'true') return;
+
+            try {
+                const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
+                const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
+
+                // อัปเดตยอดวิวรวมและ Unique ID (ใช้ Merge เพื่อสร้าง Document ถ้ายังไม่มี)
+                await setDoc(summaryRef, {
+                    totalViews: increment(1),
+                    uniqueViewers: arrayUnion(currentUser.uid)
+                }, { merge: true });
+
+                // บันทึกประวัติเครื่อง
+                await addDoc(logsRef, {
+                    uid: currentUser.uid,
+                    timestamp: Date.now(),
+                    userAgent: navigator.userAgent
+                });
+
+                sessionStorage.setItem('visited_logged', 'true');
+            } catch (e) {
+                console.error("Analytics Error:", e);
+            }
+        };
+
+        // ระบบฟังการเปลี่ยนแปลงข้อมูล Analytics
+        const setupAnalyticsListeners = () => {
+            if (!currentUser) return;
+
+            // ฟังข้อมูล Summary เพื่ออัปเดตหน้า User และ Admin
+            if (!analyticsListenerUnsubscribe) {
+                const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
+                analyticsListenerUnsubscribe = onSnapshot(summaryRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        const total = data.totalViews || 0;
+                        const unique = data.uniqueViewers ? data.uniqueViewers.length : 0;
+                        
+                        if(document.getElementById('user-total-views')) document.getElementById('user-total-views').innerText = total;
+                        if(document.getElementById('user-unique-views')) document.getElementById('user-unique-views').innerText = unique;
+                        if(document.getElementById('admin-total-views')) document.getElementById('admin-total-views').innerText = total;
+                        if(document.getElementById('admin-unique-views')) document.getElementById('admin-unique-views').innerText = unique;
+                    }
+                });
+            }
+
+            // ฟังข้อมูล Logs เฉพาะแอดมินเท่านั้นเพื่อประหยัดโควต้าฐานข้อมูล
+            if (isAdminAuthorized) {
+                if (!logsListenerUnsubscribe) {
+                    const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
+                    logsListenerUnsubscribe = onSnapshot(logsRef, (snapshot) => {
+                        let logs = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                        // เรียงจากใหม่ไปเก่าใน Memory
+                        logs.sort((a, b) => b.timestamp - a.timestamp);
+                        
+                        const tbody = document.getElementById('admin-visitor-logs');
+                        if(tbody) {
+                            if (logs.length === 0) {
+                                tbody.innerHTML = '<tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>';
+                            } else {
+                                // แสดงผล 50 รายการล่าสุด
+                                tbody.innerHTML = logs.slice(0, 50).map(log => {
+                                    const date = new Date(log.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+                                    let parsedUa = log.userAgent;
+                                    let device = 'Unknown Device';
+                                    if(parsedUa.includes('iPhone')) device = 'iPhone';
+                                    else if(parsedUa.includes('iPad')) device = 'iPad';
+                                    else if(parsedUa.includes('Android')) device = 'Android';
+                                    else if(parsedUa.includes('Windows')) device = 'Windows PC';
+                                    else if(parsedUa.includes('Mac OS')) device = 'Mac';
+                                    else if(parsedUa.includes('Linux')) device = 'Linux';
+                                    
+                                    return `<tr class="border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors">
+                                        <td class="py-3 px-4">${date}</td>
+                                        <td class="py-3 px-4 text-[7px] text-zinc-500 font-mono tracking-widest">${log.uid.substring(0,8)}...</td>
+                                        <td class="py-3 px-4 text-zinc-300" title="${log.userAgent}">${device}</td>
+                                    </tr>`;
+                                }).join('');
+                            }
+                        }
+                    });
+                }
+            } else {
+                if (logsListenerUnsubscribe) {
+                    logsListenerUnsubscribe();
+                    logsListenerUnsubscribe = null;
+                }
+            }
+        };
 
         // Cinematic Transition Logic
         window.addEventListener('load', () => {
@@ -84,7 +182,6 @@
             const mainLogo = document.getElementById('main-logo');
             const appContent = document.getElementById('app-content');
             const transitionOverlay = document.getElementById('transition-overlay');
-            const soundPrompt = document.getElementById('sound-prompt');
             
             document.documentElement.style.overflow = 'hidden';
             document.body.style.overflow = 'hidden';
@@ -134,9 +231,8 @@
                                 document.body.style.overflowX = 'hidden';
                                 window.scrollTo(0, 0);
 
-                                if (siteStatus === 'open' && !window.location.hash.includes('admin')) {
-                                    soundPrompt.classList.remove('translate-y-20', 'opacity-0');
-                                }
+                                // การแสดงผล Prompt เสียงจะถูกจัดการใน renderViewerLinks() 
+                                // เพื่อเช็คเงื่อนไข Smart Sound อัตโนมัติ
                             }, 1200);
                         }, 800);
                     }, 600);
@@ -168,27 +264,20 @@
             }
         };
 
-        window.toggleGlobalSound = () => {
-            isGlobalMuted = !isGlobalMuted;
-            const soundBtn = document.getElementById('global-sound-btn');
+        // ระบบ Minimal เปิดเสียง (เมื่อคลิกเปิดแล้วจะหายไปตลอด Session)
+        window.enableSound = () => {
+            isGlobalMuted = false;
+            window.soundPromptDismissed = true;
+            
+            const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
-            
-            // อัปเดตไอคอนด้วย Lucide
-            soundBtn.innerHTML = isGlobalMuted ? 
-                '<i data-lucide="volume-x" class="w-5 h-5 text-red-500"></i>' : 
-                '<i data-lucide="volume-2" class="w-5 h-5 text-green-500"></i>';
-            
-            lucide.createIcons();
-            
-            soundBtn.classList.toggle('bg-red-900/10', isGlobalMuted);
-            soundBtn.classList.toggle('border-red-900/30', isGlobalMuted);
-            soundBtn.classList.toggle('bg-green-900/10', !isGlobalMuted);
-            soundBtn.classList.toggle('border-green-900/30', !isGlobalMuted);
 
-            soundPrompt.classList.add('opacity-0', 'translate-y-20');
-            setTimeout(() => soundPrompt.style.display = 'none', 500);
+            soundPrompt.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                soundControls.classList.add('hidden');
+            }, 500);
 
-            renderViewerLinks();
+            renderViewerLinks(); // Re-render iframes to unmute
         };
 
         window.checkAdminPassword = () => {
@@ -196,6 +285,7 @@
             if (passInput.value === ADMIN_PASSWORD) {
                 isAdminAuthorized = true;
                 sessionStorage.setItem('isAdminAuthorized', 'true');
+                setupAnalyticsListeners(); // โหลดข้อมูล Dashboard
                 renderApp();
             } else {
                 document.getElementById('login-error').classList.remove('hidden');
@@ -224,7 +314,7 @@
                     soundControls.classList.add('hidden');
                 } else {
                     viewerPage.classList.remove('hidden');
-                    soundControls.classList.remove('hidden');
+                    recordVisit(); // บันทึกคนดูเมื่อเปิดหน้าทั่วไป
                     loadLinks(false);
                 }
             }
@@ -259,6 +349,20 @@
 
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
+            const hasVideo = visibleLinks.some(link => link.type === 'video');
+            
+            // Smart Sound UI Check
+            const soundControls = document.getElementById('global-sound-controls');
+            const soundPrompt = document.getElementById('sound-prompt');
+            
+            if (hasVideo && isGlobalMuted && !window.soundPromptDismissed) {
+                soundControls.classList.remove('hidden');
+                setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
+            } else {
+                soundPrompt.classList.add('opacity-0', 'translate-y-10');
+                setTimeout(() => soundControls.classList.add('hidden'), 500);
+            }
+
             if (visibleLinks.length === 0) {
                 if (isInitialLoad) {
                     linksContainer.innerHTML = '<div class="animate-pulse space-y-10"><div class="h-48 bg-zinc-900 rounded-2xl opacity-10"></div></div>';
@@ -389,6 +493,14 @@
             } catch (err) { console.error(err); }
         };
 
+        // เพิ่มฟังก์ชันเปิด/ปิดเว็บไซต์
+        window.toggleSiteStatus = async () => {
+            const newStatus = siteStatus === 'open' ? 'closed' : 'open';
+            try {
+                await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'settings', 'site_config'), { status: newStatus });
+            } catch (err) { console.error(err); }
+        };
+
         window.handleTypeChange = (mode) => {
             const typeSelect = document.getElementById(mode === 'add' ? 'type' : 'edit-type');
             const ratioWrapper = document.getElementById(mode === 'add' ? 'add-ratio-wrapper' : 'edit-ratio-wrapper');
@@ -470,6 +582,7 @@
             isAdminAuthorized = false;
             sessionStorage.removeItem('isAdminAuthorized');
             window.location.hash = '';
+            setupAnalyticsListeners(); // อัปเดตเพื่อยกเลิกการฟัง Logs
             renderApp();
         };
 
@@ -605,23 +718,15 @@
     <!-- WHITE TRANSITION OVERLAY -->
     <div id="transition-overlay"></div>
 
-    <!-- SOUND CONTROLS (Floating) -->
-    <div id="global-sound-controls" class="hidden fixed bottom-8 right-6 z-[2000] flex flex-col items-end gap-4 pointer-events-none">
-        <!-- Sound Prompt Toast -->
-        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-20 glass-panel p-4 rounded-3xl shadow-2xl flex items-center gap-4">
-            <div class="w-8 h-8 rounded-full bg-red-900/20 flex items-center justify-center">
-                <i data-lucide="volume-2" class="w-4 h-4 text-red-500"></i>
+    <!-- SMART SOUND PROMPT (Minimalist) -->
+    <div id="global-sound-controls" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[2000] pointer-events-none">
+        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-10 glass-panel px-5 py-2.5 rounded-full shadow-2xl flex items-center justify-between gap-4 border border-zinc-700/50 min-w-[180px]">
+            <div class="flex items-center gap-2">
+                <i data-lucide="volume-2" class="w-3.5 h-3.5 text-zinc-400"></i>
+                <p class="text-[9px] uppercase tracking-widest text-zinc-300 m-0">Sound</p>
             </div>
-            <div class="flex flex-col">
-                <p class="text-[10px] font-bold uppercase tracking-widest text-white leading-none">ต้องการเปิดเสียงหรือไม่?</p>
-                <p class="text-[8px] uppercase tracking-wider text-zinc-500 mt-1">แตะเพื่อรับชมพร้อมเสียง</p>
-            </div>
-            <button onclick="window.toggleGlobalSound()" class="bg-red-600 hover:bg-red-500 text-white text-[9px] font-bold py-2 px-4 rounded-2xl transition-all uppercase tracking-widest ml-2 shadow-lg shadow-red-900/20">เปิดเสียง</button>
+            <button onclick="window.enableSound()" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600/50 text-white text-[8px] py-1.5 px-4 rounded-full transition-all uppercase tracking-wider shadow-lg">Enable</button>
         </div>
-        <!-- Toggle Button -->
-        <button id="global-sound-btn" onclick="window.toggleGlobalSound()" class="pointer-events-auto w-14 h-14 flex items-center justify-center rounded-full glass-panel border border-white/10 shadow-2xl hover:scale-110 active:scale-95 transition-all">
-            <i data-lucide="volume-x" class="w-5 h-5 text-red-500"></i>
-        </button>
     </div>
 
     <!-- MAIN APP CONTENT -->
@@ -640,7 +745,14 @@
                 
                 <div id="links-container" class="space-y-12 max-w-[500px] w-full mx-auto pb-4"></div>
                 
-                <footer class="w-full py-8">
+                <footer class="w-full py-8 flex flex-col items-center mt-10">
+                    <!-- User View Stats -->
+                    <div class="flex justify-center items-center gap-4 text-[8px] tracking-[0.2em] uppercase font-light text-zinc-600 mb-6 border border-zinc-900/50 px-5 py-2.5 rounded-full bg-zinc-900/10">
+                        <span>Views <b id="user-total-views" class="text-zinc-400 ml-1 font-medium">0</b></span>
+                        <span class="w-px h-3 bg-zinc-800"></span>
+                        <span>Unique <b id="user-unique-views" class="text-zinc-400 ml-1 font-medium">0</b></span>
+                    </div>
+                    
                     <a href="#admin" class="text-zinc-900 hover:text-zinc-800 text-[8px] tracking-widest uppercase transition-colors font-light">Project Management</a>
                 </footer>
             </div>
@@ -695,6 +807,7 @@
         </div>
         
         <div class="grid lg:grid-cols-5 gap-6 md:gap-10 text-left w-full max-w-6xl mx-auto">
+            <!-- ซ้าย: แบบฟอร์มเพิ่มข้อมูล -->
             <div class="lg:col-span-2 w-full min-w-0">
                 <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 lg:sticky lg:top-10 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
                     <h2 class="text-[10px] md:text-xs font-bold mb-6 md:mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
@@ -729,11 +842,55 @@
                 </div>
             </div>
             
+            <!-- ขวา: รายการ Active Sequence -->
             <div class="lg:col-span-3 w-full min-w-0">
                 <div class="bg-zinc-900/5 p-4 md:p-8 rounded-3xl md:rounded-[3rem] border border-zinc-900 w-full box-border overflow-hidden">
                     <h2 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700">Active Sequence</h2>
                     <p class="text-[7px] md:text-[8px] text-zinc-800 mb-6 md:mb-8 uppercase tracking-widest font-light">Drag ☰ icons to reorder elements</p>
                     <div id="admin-links-container" class="space-y-2 w-full overflow-hidden"></div>
+                </div>
+            </div>
+
+            <!-- ล่างสุด: Analytics & Visitor Logs -->
+            <div class="lg:col-span-5 w-full min-w-0 mt-4 md:mt-8">
+                <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
+                    <h2 class="text-[10px] md:text-xs font-bold mb-6 flex items-center uppercase tracking-[0.2em] text-zinc-600">
+                        <span class="w-1 h-3 bg-zinc-500 mr-3 rounded-full text-left"></span> Analytics & Visitor Logs
+                    </h2>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center">
+                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">Total Views</p>
+                            <p id="admin-total-views" class="text-2xl md:text-3xl text-white font-light tracking-tighter">0</p>
+                        </div>
+                        <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center">
+                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">Unique Viewers</p>
+                            <p id="admin-unique-views" class="text-2xl md:text-3xl text-zinc-300 font-light tracking-tighter">0</p>
+                        </div>
+                        <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 col-span-2 flex flex-col items-center justify-center text-center px-4">
+                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">System Status</p>
+                            <p class="text-[9px] text-green-700 uppercase tracking-widest font-bold">Tracking Active</p>
+                            <p class="text-[7px] text-zinc-600 mt-1 uppercase tracking-widest">Auto-updating metrics</p>
+                        </div>
+                    </div>
+
+                    <div class="w-full border border-zinc-900 rounded-2xl overflow-hidden bg-black/20">
+                        <div class="max-h-64 overflow-y-auto custom-scrollbar p-1">
+                            <table class="w-full text-left text-[9px] text-zinc-400 border-collapse">
+                                <thead class="sticky top-0 bg-[#070707] uppercase tracking-widest text-zinc-600 text-[8px] border-b border-zinc-800">
+                                    <tr>
+                                        <th class="py-3 px-4 font-normal">Timestamp</th>
+                                        <th class="py-3 px-4 font-normal">UID (Hash)</th>
+                                        <th class="py-3 px-4 font-normal">Device / Platform</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-visitor-logs" class="divide-y divide-zinc-900/50">
+                                    <!-- Logs -->
+                                    <tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
