@@ -306,17 +306,6 @@
                                 document.body.style.overflowX = 'hidden';
                                 window.scrollTo(0, 0);
 
-                                // --- Force Play After Splash Screen ---
-                                // สั่งเล่นวิดีโอทันทีที่หน้าจอเปิดสำเร็จ เพื่อเพิ่มโอกาส Autoplay บนมือถือ
-                                Object.values(window.ytPlayers).forEach(player => {
-                                    try {
-                                        if (typeof player.playVideo === 'function') {
-                                            if (isGlobalMuted) player.mute();
-                                            player.playVideo();
-                                        }
-                                    } catch(e) {}
-                                });
-
                             }, 1200);
                         }, 800);
                     }, 600);
@@ -328,7 +317,7 @@
         window.addEventListener('blur', () => {
             setTimeout(() => {
                 const active = document.activeElement;
-                if (active && active.tagName === 'IFRAME' && active.classList.contains('yt-video-frame')) {
+                if (active && active.tagName === 'IFRAME' && active.src && active.src.includes('youtube')) {
                     if (isGlobalMuted) {
                         isGlobalMuted = false;
                         window.soundPromptDismissed = true;
@@ -391,24 +380,24 @@
         window.initYTPlayers = () => {
             if (!window.ytApiReady || typeof YT === 'undefined' || !YT.Player) return;
 
-            // ปิด Observer ตัวเก่าก่อนเริ่มใหม่ ป้องกันบั๊กซ้อนทับ
+            // ตัดการเชื่อมต่อ Observer เดิมก่อน ป้องกันรันซ้ำซ้อน
             if (window.ytObserver) window.ytObserver.disconnect();
             
-            window.ytPlayers = {}; // เคลียร์ Player สำหรับการ Render ใหม่
+            window.ytPlayers = {}; 
             
-            // สร้าง Observer เพื่อให้วิดีโอเล่นเมื่อเลื่อนมาเจอ และหยุดพักเมื่อเลื่อนผ่าน
+            // สร้าง Observer ติดตามว่าวิดีโอโผล่มาในจอหรือยัง (โผล่มา 30% ให้เล่น)
             window.ytObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
-                    const iframeId = entry.target.id;
-                    const player = window.ytPlayers[iframeId];
+                    const ytId = entry.target.getAttribute('data-yt-id');
+                    if (!ytId) return;
+                    const player = window.ytPlayers[ytId];
+                    
                     if (entry.isIntersecting) {
-                        // เมื่อวิดีโอเข้าจอ (เห็น 30%) ให้สั่งเล่น
                         if (player && typeof player.playVideo === 'function') {
-                            if (isGlobalMuted) player.mute();
+                            if (isGlobalMuted) player.mute(); // บังคับ Mute เพื่อให้เล่นผ่านกฎมือถือได้
                             player.playVideo();
                         }
                     } else {
-                        // เมื่อวิดีโอหลุดจอ ให้หยุดพักเพื่อประหยัดแบตเตอรี่/เน็ต
                         if (player && typeof player.pauseVideo === 'function') {
                             player.pauseVideo();
                         }
@@ -416,34 +405,51 @@
                 });
             }, { threshold: 0.3 });
 
-            const iframes = document.querySelectorAll('iframe.yt-video-frame');
-            iframes.forEach((iframe) => {
-                if (!iframe.id) iframe.id = `yt-player-${Math.random().toString(36).substr(2, 9)}`;
-                
-                try {
-                    window.ytPlayers[iframe.id] = new YT.Player(iframe.id, {
-                        events: {
-                            'onReady': (event) => {
-                                if (isGlobalMuted) {
-                                    event.target.mute(); 
-                                }
-                                // เริ่มติดตามวิดีโอนี้ว่าโผล่ในจอไหม
-                                window.ytObserver.observe(iframe);
+            // ค้นหาที่วางวิดีโอ (Placeholder) ทั้งหมดและสร้าง Player ทับลงไป
+            const wrappers = document.querySelectorAll('.yt-video-wrapper');
+            wrappers.forEach(wrapper => {
+                const placeholder = wrapper.querySelector('.yt-video-placeholder');
+                if (placeholder) {
+                    const ytId = placeholder.id;
+                    const videoId = placeholder.getAttribute('data-video-id');
+                    
+                    // ให้ Observer จับตาดูที่ตัว Wrapper กรอบนอกสุด (เพราะ Placeholder จะถูกลบทิ้งตอนสร้าง iframe)
+                    wrapper.setAttribute('data-yt-id', ytId);
+                    window.ytObserver.observe(wrapper);
+
+                    try {
+                        window.ytPlayers[ytId] = new YT.Player(ytId, {
+                            videoId: videoId,
+                            width: '100%',
+                            height: '100%',
+                            playerVars: {
+                                'autoplay': 1,
+                                'mute': 1,
+                                'playsinline': 1,
+                                'rel': 0,
+                                'modestbranding': 1,
+                                'vq': 'hd1080'
                             },
-                            'onStateChange': (event) => {
-                                // หากตรวจพบว่าวิดีโอเล่นอยู่และมีเสียง (ผู้ใช้กดที่ตัววิดีโอเอง)
-                                if (isGlobalMuted && event.data === 1 && !event.target.isMuted()) {
-                                    isGlobalMuted = false;
-                                    window.soundPromptDismissed = true;
-                                    hidePrompt();
-                                    document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
+                            events: {
+                                'onReady': (event) => {
+                                    if (isGlobalMuted) event.target.mute();
+                                    else event.target.unMute();
+                                },
+                                'onStateChange': (event) => {
+                                    // หากผู้ใช้กดที่ตัววิดีโอเอง (ผ่านปุ่มของ YouTube) และวิดีโอเปิดเสียงแล้ว
+                                    if (isGlobalMuted && event.data === 1 && !event.target.isMuted()) {
+                                        isGlobalMuted = false;
+                                        window.soundPromptDismissed = true;
+                                        hidePrompt();
+                                        document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
+                                    }
+                                    window.updateSoundPromptVisibility();
                                 }
-                                window.updateSoundPromptVisibility();
                             }
-                        }
-                    });
-                } catch(e) {
-                    console.error("YT Player init error", e);
+                        });
+                    } catch(e) {
+                        console.error("YT Player init error", e);
+                    }
                 }
             });
         };
@@ -462,7 +468,7 @@
                 const player = window.ytPlayers[id];
                 try {
                     if (typeof player.unMute === 'function') player.unMute();
-                    // บังคับเล่นวิดีโอที่ผู้ใช้ตั้งใจแตะ แม้ก่อนหน้านี้จะค้างอยู่
+                    // บังคับเล่นวิดีโอที่ผู้ใช้ตั้งใจแตะ
                     if (id === ytId && typeof player.playVideo === 'function') {
                         player.playVideo(); 
                     }
@@ -529,6 +535,7 @@
                     if (typeof player.unMute === 'function') {
                         player.unMute();
                         if (player.getPlayerState() === 1 && !firstPlayingIframe) {
+                            // หาตัวที่กำลังเล่นอยู่เพื่อเลื่อนหน้าจอไปหา
                             firstPlayingIframe = player.getIframe();
                         }
                     }
@@ -600,16 +607,12 @@
             });
         };
 
-        const getEmbedUrl = (url) => {
+        // ฟังก์ชันดึง Video ID จาก URL
+        const getVideoId = (url) => {
             if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
-            if (match && match[2].length === 11) {
-                const originUrl = encodeURIComponent(window.location.origin);
-                // บังคับ Mute ใน URL ไว้เสมอเพื่อให้เบราว์เซอร์อนุญาตการ Autoplay
-                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${originUrl}&vq=hd1080`;
-            }
-            return null;
+            return (match && match[2].length === 11) ? match[2] : null;
         };
 
         window.openLightbox = (url) => {
@@ -704,7 +707,7 @@
                         </div>
                     `;
                 } else if (link.type === 'video') {
-                    const embedUrl = getEmbedUrl(link.url);
+                    const videoId = getVideoId(link.url);
                     const ratio = link.ratio || '16/9';
                     const ytId = `yt-player-${link.id}`; 
                     return `
@@ -713,10 +716,11 @@
                                 <h3 class=\"text-white text-[9px] md:text-[11px] font-medium opacity-80 uppercase tracking-wider\">${link.title}</h3>
                                 ${shareBtnHtml}
                             </div>
-                            <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
-                                ${embedUrl ? 
+                            <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl yt-video-wrapper\" data-yt-id="${ytId}" style=\"aspect-ratio: ${ratio}\">
+                                ${videoId ? 
                                     `
-                                    <iframe id="${ytId}" class=\"w-full h-full yt-video-frame relative z-10\" src=\"${embedUrl}\" title=\"YouTube video player\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen></iframe>
+                                    <!-- กล่องเปล่าที่จะถูก YouTube API นำ iframe มาแทนที่แบบสมบูรณ์ -->
+                                    <div id="${ytId}" class="w-full h-full yt-video-placeholder" data-video-id="${videoId}"></div>
                                     <!-- Magic Overlay: แผ่นใสดักจับการกดเพื่อเปิดเสียงอัตโนมัติ -->
                                     <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay flex items-center justify-center bg-transparent" onclick="window.handleVideoTap('${ytId}')"></div>
                                     ` : 
@@ -768,7 +772,7 @@
                 if (typeof window.initYTPlayers === 'function') {
                     window.initYTPlayers();
                 }
-            }, 500);
+            }, 300);
         };
 
         const renderAdminLinks = () => {
