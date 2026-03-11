@@ -524,7 +524,7 @@
             window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
         };
 
-        // --- ระบบอัปเดตป๊อปอัพเสียง (เช็ค 2 ชั้นเพื่อป้องกันการโชว์ผิดจังหวะในโหมดประหยัดพลังงาน) ---
+        // --- ระบบอัปเดตป๊อปอัพเสียง (บังคับตรวจสอบอย่างเข้มงวด) ---
         window.updateSoundPromptVisibility = () => {
             if (window.soundPromptDismissed) {
                 hidePrompt();
@@ -536,13 +536,14 @@
                 const player = window.ytPlayers[id];
                 try {
                     if (typeof player.getPlayerState === 'function') {
-                        // เช็คว่า State คือ 1 (เล่นอยู่) และต้องเล่นไปแล้ว > 0.5 วินาที (ป้องกันการหลอกของระบบ)
-                        if (player.getPlayerState() === 1 && player.getCurrentTime() > 0.5 && player.isMuted()) {
+                        const state = player.getPlayerState();
+                        // บังคับเช็คแค่ว่ากำลังเล่น (1) หรือกำลังโหลด (3) และถูกปิดเสียงอยู่ (ถอดการเช็คเวลาออกทั้งหมด)
+                        if ((state === 1 || state === 3) && player.isMuted()) {
                             const wrapper = document.querySelector(`[data-yt-id="${id}"]`);
                             if (wrapper) {
                                 const rect = wrapper.getBoundingClientRect();
-                                // เช็คว่ามีกรอบวิดีโอโผล่เข้ามาในขอบเขตหน้าจอมือถือหรือไม่
-                                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                                // ขยายขอบเขตการคำนวณหน้าจอ (+200px) ป้องกันมือถือคำนวณขอบเขตพลาด
+                                if (rect.top < (window.innerHeight || document.documentElement.clientHeight) + 200 && rect.bottom > -200) {
                                     isAnyVisibleAndPlayingMuted = true;
                                 }
                             }
@@ -554,7 +555,7 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            // ถ้ามีวิดีโอกำลังเล่นอยู่ในหน้าจอจริงๆ และระบบเสียงรวมยังปิดอยู่ -> แสดงป๊อปอัพ
+            // บังคับโชว์ป๊อปอัพทันทีที่พบวิดีโอเล่นแต่ไม่มีเสียง
             if (isAnyVisibleAndPlayingMuted && isGlobalMuted) {
                 if (window.hidePromptTimeout) {
                     clearTimeout(window.hidePromptTimeout);
@@ -588,12 +589,12 @@
             }, 600);
         }
 
-        // เสริมความปลอดภัยด้วยการเช็คซ้ำทุกๆ 800ms
+        // เสริมความปลอดภัยด้วยการเช็คซ้ำทุกๆ 500ms (เร็วขึ้นเพื่อให้ป๊อปอัพตอบสนองทันที)
         setInterval(() => {
             if (document.querySelectorAll('.yt-video-wrapper').length > 0 && !window.soundPromptDismissed) {
                 window.updateSoundPromptVisibility();
             }
-        }, 800);
+        }, 500);
 
         window.enableSound = () => {
             isGlobalMuted = false;
