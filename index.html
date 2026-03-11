@@ -18,7 +18,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // เพิ่ม increment และ arrayUnion สำหรับระบบ Analytics
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, writeBatch, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
@@ -49,6 +48,7 @@
         // Analytics Listeners State
         let analyticsListenerUnsubscribe = null;
         let logsListenerUnsubscribe = null;
+        window.currentLogsData = []; // เก็บไว้สำหรับ Export CSV
 
         const viewerPage = document.getElementById('viewer-page');
         const adminPage = document.getElementById('admin-page');
@@ -75,7 +75,6 @@
             renderApp(); 
         });
 
-        // ระบบบันทึกยอดผู้เข้าชม (Auto View Tracking)
         const recordVisit = async () => {
             if (!currentUser || isAdminAuthorized || sessionStorage.getItem('visited_logged') === 'true') return;
 
@@ -83,13 +82,11 @@
                 const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
                 const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
 
-                // อัปเดตยอดวิวรวมและ Unique ID (ใช้ Merge เพื่อสร้าง Document ถ้ายังไม่มี)
                 await setDoc(summaryRef, {
                     totalViews: increment(1),
                     uniqueViewers: arrayUnion(currentUser.uid)
                 }, { merge: true });
 
-                // บันทึกประวัติเครื่อง
                 await addDoc(logsRef, {
                     uid: currentUser.uid,
                     timestamp: Date.now(),
@@ -102,11 +99,9 @@
             }
         };
 
-        // ระบบฟังการเปลี่ยนแปลงข้อมูล Analytics
         const setupAnalyticsListeners = () => {
             if (!currentUser) return;
 
-            // ฟังข้อมูล Summary เพื่ออัปเดตหน้า User และ Admin
             if (!analyticsListenerUnsubscribe) {
                 const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
                 analyticsListenerUnsubscribe = onSnapshot(summaryRef, (docSnap) => {
@@ -123,21 +118,19 @@
                 });
             }
 
-            // ฟังข้อมูล Logs เฉพาะแอดมินเท่านั้นเพื่อประหยัดโควต้าฐานข้อมูล
             if (isAdminAuthorized) {
                 if (!logsListenerUnsubscribe) {
                     const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
                     logsListenerUnsubscribe = onSnapshot(logsRef, (snapshot) => {
                         let logs = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-                        // เรียงจากใหม่ไปเก่าใน Memory
                         logs.sort((a, b) => b.timestamp - a.timestamp);
+                        window.currentLogsData = logs; // อัปเดตข้อมูลสำหรับ Export CSV
                         
                         const tbody = document.getElementById('admin-visitor-logs');
                         if(tbody) {
                             if (logs.length === 0) {
                                 tbody.innerHTML = '<tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>';
                             } else {
-                                // แสดงผล 50 รายการล่าสุด
                                 tbody.innerHTML = logs.slice(0, 50).map(log => {
                                     const date = new Date(log.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
                                     let parsedUa = log.userAgent;
@@ -167,14 +160,12 @@
             }
         };
 
-        // Cinematic Transition Logic
         window.addEventListener('load', () => {
             if ('scrollRestoration' in history) {
                 history.scrollRestoration = 'manual';
             }
             window.scrollTo(0, 0);
 
-            // Initialize Lucide Icons
             lucide.createIcons();
 
             const splash = document.getElementById('splash-screen');
@@ -230,14 +221,21 @@
                                 document.body.style.overflowY = 'auto'; 
                                 document.body.style.overflowX = 'hidden';
                                 window.scrollTo(0, 0);
-
-                                // การแสดงผล Prompt เสียงจะถูกจัดการใน renderViewerLinks() 
-                                // เพื่อเช็คเงื่อนไข Smart Sound อัตโนมัติ
                             }, 1200);
                         }, 800);
                     }, 600);
                 }, 1100); 
             }, 2500); 
+        });
+
+        // ควบคุมปุ่ม Back to Top
+        window.addEventListener('scroll', () => {
+            const btt = document.getElementById('back-to-top');
+            if(window.scrollY > 400) {
+                btt.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+            } else {
+                btt.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+            }
         });
 
         const loadSiteConfig = () => {
@@ -264,7 +262,6 @@
             }
         };
 
-        // ระบบ Minimal เปิดเสียง (เมื่อคลิกเปิดแล้วจะหายไปตลอด Session)
         window.enableSound = () => {
             isGlobalMuted = false;
             window.soundPromptDismissed = true;
@@ -277,16 +274,21 @@
             setTimeout(() => {
                 soundControls.classList.add('hidden');
                 
-                // แสดงป็อปอัพแจ้งเตือนว่าเปิดเสียงสำเร็จแล้ว
                 successToast.classList.remove('opacity-0', 'translate-y-10');
                 
-                // ซ่อนป็อปอัพแจ้งเตือนหลังจาก 3 วินาที
                 setTimeout(() => {
                     successToast.classList.add('opacity-0', 'translate-y-10');
                 }, 3000);
             }, 500);
 
-            renderViewerLinks(); // Re-render iframes to unmute
+            // แทนที่จะ render ใหม่ทั้งหมด ให้ค้นหาแค่ iframe วิดีโอแล้วเปลี่ยนค่า mute
+            // รูปภาพจะได้ไม่ถูกเคลียร์ทิ้งและโหลดใหม่
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+                if (iframe.src && iframe.src.includes('mute=1')) {
+                    iframe.src = iframe.src.replace('mute=1', 'mute=0');
+                }
+            });
         };
 
         window.checkAdminPassword = () => {
@@ -294,7 +296,7 @@
             if (passInput.value === ADMIN_PASSWORD) {
                 isAdminAuthorized = true;
                 sessionStorage.setItem('isAdminAuthorized', 'true');
-                setupAnalyticsListeners(); // โหลดข้อมูล Dashboard
+                setupAnalyticsListeners(); 
                 renderApp();
             } else {
                 document.getElementById('login-error').classList.remove('hidden');
@@ -323,7 +325,7 @@
                     soundControls.classList.add('hidden');
                 } else {
                     viewerPage.classList.remove('hidden');
-                    recordVisit(); // บันทึกคนดูเมื่อเปิดหน้าทั่วไป
+                    recordVisit(); 
                     loadLinks(false);
                 }
             }
@@ -356,11 +358,47 @@
             return null;
         };
 
+        // ระบบ Lightbox ซูมภาพ
+        window.openLightbox = (url) => {
+            document.getElementById('lightbox-img').src = url;
+            const lb = document.getElementById('lightbox-modal');
+            lb.classList.remove('hidden');
+            lb.classList.add('flex');
+            setTimeout(() => lb.classList.remove('opacity-0'), 10);
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.closeLightbox = () => {
+            const lb = document.getElementById('lightbox-modal');
+            lb.classList.add('opacity-0');
+            setTimeout(() => {
+                lb.classList.add('hidden');
+                lb.classList.remove('flex');
+                document.getElementById('lightbox-img').src = '';
+                document.body.style.overflow = '';
+            }, 300);
+        };
+
+        // ระบบคัดลอก URL
+        window.copyUrl = (url) => {
+            // หาก URL ว่าง ให้ใช้ URL ของหน้าเว็บปัจจุบัน
+            const textToCopy = url || window.location.href;
+            const tempInput = document.createElement("input");
+            tempInput.value = textToCopy;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            const toast = document.getElementById('copy-toast');
+            toast.classList.remove('opacity-0', 'translate-y-10');
+            setTimeout(() => toast.classList.add('opacity-0', 'translate-y-10'), 2500);
+        };
+
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
             const hasVideo = visibleLinks.some(link => link.type === 'video');
             
-            // Smart Sound UI Check
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
             
@@ -385,12 +423,21 @@
                 const delay = (index * 0.15) + 0.5;
                 const descHtml = link.description ? `<p class="text-zinc-500 text-[10px] md:text-xs mt-3 leading-relaxed whitespace-pre-wrap text-left font-light">${link.description}</p>` : '';
                 
+                // ปุ่มแชร์
+                const shareBtnHtml = `<button onclick="window.copyUrl('${link.url || ''}')" class="text-zinc-600 hover:text-red-500 transition-colors p-1 bg-zinc-900/50 rounded-lg border border-zinc-800" title="คัดลอกลิงก์"><i data-lucide="share-2" class="w-3.5 h-3.5"></i></button>`;
+
                 if (link.type === 'image') {
                     return `
                         <div class="reveal-item w-full mb-14 text-left" style="animation-delay: ${delay}s">
-                            <h3 class="text-white text-[10px] md:text-[11px] font-medium opacity-60 uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl mt-4 bg-zinc-900/10">
-                                <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-contain block mx-auto" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-white text-[10px] md:text-[11px] font-medium opacity-60 uppercase tracking-wider">${link.title}</h3>
+                                ${shareBtnHtml}
+                            </div>
+                            <div class="relative overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl mt-2 bg-zinc-900/10 group cursor-pointer" onclick="window.openLightbox('${link.url}')">
+                                <img src="${link.url}" alt="${link.title}" class="w-full h-auto object-contain block mx-auto transition-transform duration-700 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                                    <i data-lucide="zoom-in" class="text-white w-8 h-8 opacity-70"></i>
+                                </div>
                             </div>
                             ${descHtml}
                         </div>
@@ -400,8 +447,11 @@
                     const ratio = link.ratio || '16/9';
                     return `
                         <div class="reveal-item w-full mb-14 text-left" style="animation-delay: ${delay}s">
-                            <h3 class="text-white text-[9px] md:text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
-                            <div class="relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-4 shadow-2xl" style="aspect-ratio: ${ratio}">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-white text-[9px] md:text-[11px] font-medium opacity-80 uppercase tracking-wider">${link.title}</h3>
+                                ${shareBtnHtml}
+                            </div>
+                            <div class="relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl" style="aspect-ratio: ${ratio}">
                                 ${embedUrl ? 
                                     `<iframe class="w-full h-full" src="${embedUrl}" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>` : 
                                     `<div class="flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center">
@@ -417,24 +467,31 @@
                     return `
                         <div class="reveal-item w-full mb-14 text-left p-8 rounded-3xl border border-zinc-800 bg-zinc-900/10 relative overflow-hidden shadow-lg" style="animation-delay: ${delay}s">
                             <div class="absolute top-0 left-0 w-1 h-full bg-red-900/50"></div>
-                            <h3 class="text-red-600 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] border-b border-zinc-900/50 pb-4 mb-4">${link.title}</h3>
+                            <div class="flex justify-between items-start border-b border-zinc-900/50 pb-4 mb-4">
+                                <h3 class="text-red-600 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em]">${link.title}</h3>
+                                ${shareBtnHtml}
+                            </div>
                             <p class="text-zinc-300 text-xs md:text-sm leading-relaxed whitespace-pre-wrap font-light">${link.description || '-'}</p>
                         </div>
                     `;
                 } else {
                     return `
-                        <a href="${link.url}" target="_blank" class="reveal-item group relative block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-600/50 p-7 rounded-3xl transition-all duration-500 hover:-translate-y-1 text-left mb-6 shadow-xl overflow-hidden" style="animation-delay: ${delay}s">
-                            <div class="flex items-center space-x-5">
-                                <div class="w-10 h-10 flex items-center justify-center rounded-2xl bg-zinc-900/50 text-zinc-500 group-hover:text-red-500 transition-colors border border-zinc-800">
-                                    <i data-lucide="link" class="w-5 h-5"></i>
+                        <div class="reveal-item relative w-full mb-6 text-left group" style="animation-delay: ${delay}s">
+                            <a href="${link.url}" target="_blank" class="block w-full bg-zinc-900/20 border border-zinc-900/50 hover:border-red-600/50 p-7 pr-16 rounded-3xl transition-all duration-500 hover:-translate-y-1 shadow-xl overflow-hidden">
+                                <div class="flex items-center space-x-5">
+                                    <div class="w-10 h-10 flex items-center justify-center rounded-2xl bg-zinc-900/50 text-zinc-500 group-hover:text-red-500 transition-colors border border-zinc-800 shrink-0">
+                                        <i data-lucide="link" class="w-5 h-5"></i>
+                                    </div>
+                                    <div class="flex-1 overflow-hidden">
+                                        <h3 class="text-white text-xs md:text-sm truncate font-medium">${link.title}</h3>
+                                        ${link.description ? `<p class="text-zinc-600 text-[9px] mt-1 truncate">${link.description}</p>` : `<p class="text-zinc-700 text-[9px] truncate mt-1 font-light opacity-50">${link.url}</p>`}
+                                    </div>
                                 </div>
-                                <div class="flex-1 overflow-hidden">
-                                    <h3 class="text-white text-xs md:text-sm truncate font-medium">${link.title}</h3>
-                                    ${link.description ? `<p class="text-zinc-600 text-[9px] mt-1 truncate">${link.description}</p>` : `<p class="text-zinc-700 text-[9px] truncate mt-1 font-light opacity-50">${link.url}</p>`}
-                                </div>
-                                <i data-lucide="chevron-right" class="text-red-900 group-hover:text-red-600 transition-all w-5 h-5"></i>
+                            </a>
+                            <div class="absolute right-6 top-1/2 -translate-y-1/2 z-10 flex gap-2">
+                                <button onclick="window.copyUrl('${link.url}')" class="text-zinc-500 hover:text-red-500 transition-colors bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 shadow-md backdrop-blur" title="คัดลอกลิงก์"><i data-lucide="share-2" class="w-4 h-4"></i></button>
                             </div>
-                        </a>
+                        </div>
                     `;
                 }
             }).join('');
@@ -502,7 +559,6 @@
             } catch (err) { console.error(err); }
         };
 
-        // เพิ่มฟังก์ชันเปิด/ปิดเว็บไซต์
         window.toggleSiteStatus = async () => {
             const newStatus = siteStatus === 'open' ? 'closed' : 'open';
             try {
@@ -518,6 +574,52 @@
             } else {
                 ratioWrapper.classList.add('hidden');
             }
+        };
+
+        // Rich Text Formatting function
+        window.formatText = (elementId, tag) => {
+            const el = document.getElementById(elementId);
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const text = el.value;
+            let replacement = "";
+            
+            if (tag === 'br') {
+                replacement = text.substring(0, start) + "<br>\n" + text.substring(end);
+            } else {
+                replacement = text.substring(0, start) + `<${tag}>` + text.substring(start, end) + `</${tag}>` + text.substring(end);
+            }
+            
+            el.value = replacement;
+            el.focus();
+            // เลื่อนเคอร์เซอร์ไปข้างหลัง tag ที่เพิ่งแทรก
+            el.selectionEnd = start + tag.length * 2 + 5 + (end - start); 
+        };
+
+        // Export CSV Function
+        window.exportCSV = () => {
+            if (window.currentLogsData.length === 0) {
+                alert("ไม่มีข้อมูลให้ Export");
+                return;
+            }
+            // เพิ่ม BOM \uFEFF ให้ Excel อ่านภาษาไทยออก
+            let csvContent = "\uFEFFTimestamp,UID,Device/Platform\n";
+            window.currentLogsData.forEach(log => {
+                const date = new Date(log.timestamp).toLocaleString('th-TH');
+                // จัดการเครื่องหมายคำพูดใน User Agent เผื่อมี
+                const ua = log.userAgent ? log.userAgent.replace(/"/g, '""') : 'Unknown';
+                csvContent += `"${date}","${log.uid}","${ua}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `visitor_logs_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         };
 
         window.openEditModal = async (id) => {
@@ -591,7 +693,7 @@
             isAdminAuthorized = false;
             sessionStorage.removeItem('isAdminAuthorized');
             window.location.hash = '';
-            setupAnalyticsListeners(); // อัปเดตเพื่อยกเลิกการฟัง Logs
+            setupAnalyticsListeners(); 
             renderApp();
         };
 
@@ -746,6 +848,27 @@
         </div>
     </div>
 
+    <!-- COPY SUCCESS TOAST -->
+    <div id="copy-toast" class="fixed top-8 left-1/2 -translate-x-1/2 z-[3001] pointer-events-none opacity-0 -translate-y-10 transition-all duration-500">
+        <div class="glass-panel px-5 py-2.5 rounded-full shadow-2xl flex items-center justify-center gap-3 border border-red-900/50 bg-black/80">
+            <i data-lucide="link" class="w-3.5 h-3.5 text-white"></i>
+            <p class="text-[9px] text-white m-0 font-medium tracking-wide whitespace-nowrap uppercase">คัดลอกลิงก์เรียบร้อยแล้ว</p>
+        </div>
+    </div>
+
+    <!-- BACK TO TOP BUTTON -->
+    <button id="back-to-top" onclick="window.scrollTo({top:0, behavior:'smooth'})" class="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[1900] w-10 h-10 md:w-12 md:h-12 bg-red-900/60 text-white rounded-full flex items-center justify-center opacity-0 pointer-events-none translate-y-4 transition-all duration-500 shadow-2xl border border-red-500/30 hover:bg-red-800 backdrop-blur-md hover:scale-110 active:scale-95">
+        <i data-lucide="arrow-up" class="w-4 h-4 md:w-5 md:h-5"></i>
+    </button>
+
+    <!-- LIGHTBOX MODAL -->
+    <div id="lightbox-modal" class="hidden fixed inset-0 z-[3000] bg-black/95 items-center justify-center p-4 backdrop-blur-md opacity-0 transition-opacity duration-300" onclick="window.closeLightbox()">
+        <button class="absolute top-6 right-6 md:top-10 md:right-10 text-zinc-500 hover:text-white transition-colors bg-black/50 p-2 rounded-full backdrop-blur-sm z-[3001]">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+        <img id="lightbox-img" src="" class="max-w-full max-h-[90vh] object-contain shadow-2xl rounded-lg" onclick="event.stopPropagation()">
+    </div>
+
     <!-- MAIN APP CONTENT -->
     <div id="app-content">
         <div id="viewer-page" class="min-h-screen flex flex-col items-center justify-start p-6 transition-all">
@@ -832,8 +955,17 @@
                     </h2>
                     <form id="add-link-form" class="space-y-4 w-full">
                         <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
-                        <textarea id="description" placeholder="DESCRIPTION (OPTIONAL)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px]"></textarea>
-                        <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                        
+                        <!-- Rich Text Toolbar -->
+                        <div class="bg-zinc-900/40 p-2 rounded-t-xl border border-zinc-800 border-b-0 flex gap-2">
+                            <button type="button" onclick="window.formatText('description', 'b')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวหนา"><i data-lucide="bold" class="w-3.5 h-3.5"></i></button>
+                            <button type="button" onclick="window.formatText('description', 'i')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวเอียง"><i data-lucide="italic" class="w-3.5 h-3.5"></i></button>
+                            <div class="w-px bg-zinc-800 mx-1"></div>
+                            <button type="button" onclick="window.formatText('description', 'br')" class="p-1.5 px-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white text-[8px] font-bold tracking-widest uppercase transition-colors" title="เว้นบรรทัด">BR</button>
+                        </div>
+                        <textarea id="description" placeholder="DESCRIPTION (OPTIONAL) - รองรับ HTML พื้นฐาน" class="w-full rounded-b-xl rounded-t-none p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px] border-t-0 mt-0"></textarea>
+                        
+                        <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest mt-4">
                         
                         <div class="space-y-4 w-full">
                             <select id="type" onchange="window.handleTypeChange('add')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
@@ -854,7 +986,7 @@
                             </div>
                         </div>
                         
-                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:bg-red-900 hover:text-white text-center">Add to Sequence</button>
+                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:bg-red-900 hover:text-white text-center mt-4">Add to Sequence</button>
                     </form>
                 </div>
             </div>
@@ -871,9 +1003,15 @@
             <!-- ล่างสุด: Analytics & Visitor Logs -->
             <div class="lg:col-span-5 w-full min-w-0 mt-4 md:mt-8">
                 <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
-                    <h2 class="text-[10px] md:text-xs font-bold mb-6 flex items-center uppercase tracking-[0.2em] text-zinc-600">
-                        <span class="w-1 h-3 bg-zinc-500 mr-3 rounded-full text-left"></span> Analytics & Visitor Logs
-                    </h2>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-[10px] md:text-xs font-bold flex items-center uppercase tracking-[0.2em] text-zinc-600">
+                            <span class="w-1 h-3 bg-zinc-500 mr-3 rounded-full text-left"></span> Analytics & Logs
+                        </h2>
+                        <!-- ปุ่ม Export CSV -->
+                        <button onclick="window.exportCSV()" class="flex items-center gap-2 px-4 py-2 bg-green-900/20 text-green-600 border border-green-900/50 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-green-800 hover:text-white transition-all">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+                        </button>
+                    </div>
                     
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center">
@@ -887,21 +1025,21 @@
                         <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 col-span-2 flex flex-col items-center justify-center text-center px-4">
                             <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">System Status</p>
                             <p class="text-[9px] text-green-700 uppercase tracking-widest font-bold">Tracking Active</p>
-                            <p class="text-[7px] text-zinc-600 mt-1 uppercase tracking-widest">Auto-updating metrics</p>
+                            <p class="text-[7px] text-zinc-600 mt-1 uppercase tracking-widest">Auto-updating metrics (Showing Top 50)</p>
                         </div>
                     </div>
 
                     <div class="w-full border border-zinc-900 rounded-2xl overflow-hidden bg-black/20">
                         <div class="max-h-64 overflow-y-auto custom-scrollbar p-1">
                             <table class="w-full text-left text-[9px] text-zinc-400 border-collapse">
-                                <thead class="sticky top-0 bg-[#070707] uppercase tracking-widest text-zinc-600 text-[8px] border-b border-zinc-800">
+                                <thead class="sticky top-0 bg-[#070707] uppercase tracking-widest text-zinc-600 text-[8px] border-b border-zinc-800 z-10">
                                     <tr>
                                         <th class="py-3 px-4 font-normal">Timestamp</th>
                                         <th class="py-3 px-4 font-normal">UID (Hash)</th>
                                         <th class="py-3 px-4 font-normal">Device / Platform</th>
                                     </tr>
                                 </thead>
-                                <tbody id="admin-visitor-logs" class="divide-y divide-zinc-900/50">
+                                <tbody id="admin-visitor-logs" class="divide-y divide-zinc-900/50 relative z-0">
                                     <!-- Logs -->
                                     <tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>
                                 </tbody>
@@ -920,8 +1058,17 @@
             <form id="edit-form" class="space-y-4">
                 <input type="hidden" id="edit-id">
                 <input type="text" id="edit-title" required class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
-                <textarea id="edit-description" placeholder="Description" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px]"></textarea>
-                <input type="url" id="edit-url" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                
+                <!-- Rich Text Toolbar -->
+                <div class="bg-zinc-900/40 p-2 rounded-t-xl border border-zinc-800 border-b-0 flex gap-2">
+                    <button type="button" onclick="window.formatText('edit-description', 'b')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวหนา"><i data-lucide="bold" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" onclick="window.formatText('edit-description', 'i')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวเอียง"><i data-lucide="italic" class="w-3.5 h-3.5"></i></button>
+                    <div class="w-px bg-zinc-800 mx-1"></div>
+                    <button type="button" onclick="window.formatText('edit-description', 'br')" class="p-1.5 px-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white text-[8px] font-bold tracking-widest uppercase transition-colors" title="เว้นบรรทัด">BR</button>
+                </div>
+                <textarea id="edit-description" placeholder="Description" class="w-full rounded-b-xl rounded-t-none p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px] border-t-0 mt-0"></textarea>
+                
+                <input type="url" id="edit-url" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest mt-4">
                 
                 <div class="space-y-4 w-full">
                     <select id="edit-type" onchange="window.handleTypeChange('edit')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
