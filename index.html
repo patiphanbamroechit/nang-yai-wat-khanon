@@ -12,6 +12,8 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- YouTube IFrame Player API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -45,8 +47,10 @@
         let isGlobalMuted = true; 
         const ADMIN_PASSWORD = "Pluk65030138";
 
-        // Track visible videos for sound prompt logic
-        const visibleVideos = new Set();
+        // YouTube Player Management
+        window.ytPlayers = {}; 
+        const visibleVideos = new Set(); // IDs of videos currently in viewport
+        const playingVideos = new Set(); // IDs of videos currently in 'PLAYING' state
         let videoObserver = null;
 
         // Analytics Listeners State
@@ -320,11 +324,15 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
             
-            // ปรากฏเมื่อมีวิดีโอประเภท Autoplay-Muted ที่กำลังแสดงอยู่บนจอเท่านั้น
-            if (visibleVideos.size > 0 && isGlobalMuted) {
+            // หาจุดร่วมระหว่างวิดีโอที่แสดงในจอ (Visible) และวิดีโอที่กำลังเล่นอยู่จริง (Playing)
+            const activeAutoplayVideos = Array.from(visibleVideos).filter(id => playingVideos.has(id));
+
+            // แสดงป๊อปอัพเฉพาะเมื่อมีวิดีโอที่กำลังเล่นอยู่จริงๆ ในจอ และระบบยัง Mute
+            if (activeAutoplayVideos.length > 0 && isGlobalMuted) {
                 soundControls.classList.remove('hidden');
                 setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
             } else {
+                // ซ่อนทันทีหากไม่พบวิดีโอที่เล่นอยู่ (เช่น ติดโหมดประหยัดพลังงาน หรือเลื่อนพ้นจอ)
                 soundPrompt.classList.add('opacity-0', 'translate-y-10');
                 setTimeout(() => soundControls.classList.add('hidden'), 500);
             }
@@ -340,30 +348,19 @@
             soundPrompt.classList.add('opacity-0', 'translate-y-10');
             setTimeout(() => {
                 soundControls.classList.add('hidden');
-                window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
+                window.showToast('เปิดเสียงและเริ่มเล่นวิดีโอใหม่ตั้งแต่ต้น', 'success');
             }, 500);
 
-            // บังคับให้วิดีโอที่มีคลาส autoplay-video เริ่มเล่นใหม่ที่วินาทีที่ 0 พร้อมเปิดเสียง
-            const iframes = document.querySelectorAll('.autoplay-video');
-            let firstIframe = null;
-            
-            iframes.forEach(iframe => {
-                if (iframe.src) {
-                    try {
-                        let url = new URL(iframe.src);
-                        url.searchParams.set('mute', '0');
-                        url.searchParams.set('autoplay', '1');
-                        url.searchParams.set('start', '0');
-                        iframe.src = url.toString();
-                        if (!firstIframe) firstIframe = iframe;
-                    } catch (e) { console.error("URL Error", e); }
-                }
+            // ใช้ API สั่ง RESTART วิดีโอทุกตัวที่เล่นอยู่เด็ดขาด
+            Object.values(window.ytPlayers).forEach(player => {
+                try {
+                    if (player && typeof player.unMute === 'function') {
+                        player.seekTo(0);    // กลับไปวินาทีที่ 0
+                        player.unMute();     // เปิดเสียง
+                        player.playVideo();  // บังคับเล่น
+                    }
+                } catch (e) { console.error("Player Control Error", e); }
             });
-
-            if (firstIframe) {
-                const container = firstIframe.closest('.reveal-item') || firstIframe;
-                container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
         };
 
         window.checkAdminPassword = () => {
@@ -423,18 +420,50 @@
             });
         };
 
-        const getEmbedUrl = (url, autoplay = true) => {
+        // YouTube Player Initialization Helpers
+        const initYTPlayer = (iframeId, videoId, isAutoplay) => {
+            window.ytPlayers[videoId] = new YT.Player(iframeId, {
+                events: {
+                    'onStateChange': (event) => {
+                        // event.data == 1 คือสถานะ PLAYING
+                        if (event.data === YT.PlayerState.PLAYING) {
+                            playingVideos.add(videoId);
+                        } else {
+                            playingVideos.delete(videoId);
+                        }
+                        window.updateSoundPromptVisibility();
+                    },
+                    'onReady': (event) => {
+                        if (isAutoplay && isGlobalMuted) {
+                            event.target.mute();
+                        }
+                    }
+                }
+            });
+        };
+
+        window.onYouTubeIframeAPIReady = () => {
+            // ฟังก์ชันนี้จะถูกเรียกโดย YouTube API เมื่อโหลดเสร็จ
+            // หากเรนเดอร์ลิงก์ไปก่อนแล้ว ค่อยมา Initialize
+            const iframes = document.querySelectorAll('.video-iframe');
+            iframes.forEach(iframe => {
+                const videoId = iframe.dataset.videoId;
+                const isAutoplay = iframe.classList.contains('autoplay-video');
+                initYTPlayer(iframe.id, videoId, isAutoplay);
+            });
+        };
+
+        const getEmbedUrl = (url, isAutoplay = true) => {
             if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) {
                 const origin = window.location.origin;
                 const videoId = match[2];
-                if (autoplay) {
+                if (isAutoplay) {
                     const muteParam = isGlobalMuted ? 1 : 0;
                     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
                 } else {
-                    // แบบปกติ (Manual Play) จะไม่มี autoplay=1
                     return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
                 }
             }
@@ -505,7 +534,6 @@
             videoObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     const videoId = entry.target.dataset.videoId;
-                    // เฉพาะวิดีโอที่มีคลาส autoplay-video เท่านั้นที่จะถูกนับ
                     if (entry.isIntersecting) {
                         visibleVideos.add(videoId);
                     } else {
@@ -515,7 +543,6 @@
                 window.updateSoundPromptVisibility();
             }, { threshold: 0.15 }); 
 
-            // ตรวจจับเฉพาะ iframe ที่มีคลาส autoplay-video เท่านั้น
             document.querySelectorAll('.autoplay-video').forEach(el => {
                 videoObserver.observe(el);
             });
@@ -524,6 +551,8 @@
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
             visibleVideos.clear(); 
+            playingVideos.clear();
+            window.ytPlayers = {}; 
             
             if (visibleLinks.length === 0) {
                 if (isInitialLoad) {
@@ -557,14 +586,11 @@
                         </div>
                     `;
                 } else if (link.type === 'video') {
-                    // ดึงค่า Autoplay จาก Database (ถ้าไม่มีให้เป็น true เป็นค่าเริ่มต้น)
                     const isAutoplay = link.autoplay !== false; 
                     const embedUrl = getEmbedUrl(link.url, isAutoplay);
                     const ratio = link.ratio || '16/9';
-                    
-                    // ป๊อปอัพจะทำงานเฉพาะคลาส 'autoplay-video'
-                    // ถ้าตั้งเป็น Manual Play จะไม่มีคลาสนี้ ทำให้ระบบตรวจจับ (Observer) ไม่ทำงานสำหรับวิดีโอนี้
                     const videoClass = isAutoplay ? 'video-iframe autoplay-video' : 'video-iframe manual-video';
+                    const iframeId = `player-${link.id}`;
                     
                     return `
                         <div class=\"reveal-item w-full mb-14 text-left\" style=\"animation-delay: ${delay}s\">
@@ -574,7 +600,7 @@
                             </div>
                             <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
                                 ${embedUrl ? 
-                                    `<iframe class=\"w-full h-full ${videoClass}\" data-video-id=\"${link.id}\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"autoplay; encrypted-media; picture-in-picture\" allowfullscreen></iframe>` : 
+                                    `<iframe id=\"${iframeId}\" class=\"w-full h-full ${videoClass}\" data-video-id=\"${link.id}\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"autoplay; encrypted-media; picture-in-picture\" allowfullscreen></iframe>` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
                                         <a href=\"${link.url}\" target=\"_blank\" class=\"text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full\">Watch on YouTube</a>
@@ -619,6 +645,15 @@
             
             lucide.createIcons();
             initVideoObserver(); 
+
+            // Initialize Players after rendering
+            if (window.YT && window.YT.Player) {
+                document.querySelectorAll('.video-iframe').forEach(iframe => {
+                    const videoId = iframe.dataset.videoId;
+                    const isAutoplay = iframe.classList.contains('autoplay-video');
+                    initYTPlayer(iframe.id, videoId, isAutoplay);
+                });
+            }
         };
 
         const renderAdminLinks = () => {
@@ -1384,7 +1419,7 @@
 
     <!-- Modal ยืนยันการลบ Item -->
     <div id="custom-confirm" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4">
-        <div class="bg-zinc-900/50 border border-zinc-900 p-8 md:p-12 rounded-3xl md:rounded-[4rem] max-w-[90vw] md:max-w-sm w-full text-center backdrop-blur-xl">
+        <div class="bg-zinc-900/50 border border-zinc-900 p-8 md:p-12 rounded-3xl md:rounded-[4rem] max-w-[90vw] md:max-sm w-full text-center backdrop-blur-xl">
             <h3 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900">Unregister Item?</h3>
             <p class="text-zinc-600 text-[8px] md:text-[9px] mb-8 md:mb-12 uppercase font-light tracking-[0.2em]">Permanent removal from sequence</p>
             <div class="grid grid-cols-2 gap-3 md:gap-4">
