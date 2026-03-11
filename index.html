@@ -78,16 +78,20 @@
         window.lockScroll = () => {
             scrollPosition = window.scrollY;
             document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
             document.body.style.position = 'fixed';
             document.body.style.top = `-${scrollPosition}px`;
             document.body.style.width = '100%';
+            document.body.style.left = '0';
         };
 
         window.unlockScroll = () => {
             document.body.style.removeProperty('overflow');
+            document.documentElement.style.removeProperty('overflow');
             document.body.style.removeProperty('position');
             document.body.style.removeProperty('top');
             document.body.style.removeProperty('width');
+            document.body.style.removeProperty('left');
             window.scrollTo(0, scrollPosition);
         };
 
@@ -308,6 +312,29 @@
             }, 2500); 
         });
 
+        // --- ดักจับการกดที่วิดีโอ YouTube โดยตรง (Smart Tap Detection) ---
+        // ถ้าผู้ใช้กดวิดีโอเอง (บนมือถือหรือคอม) หน้าต่างจะสูญเสีย Focus เราจะทำการเปิดเสียงให้ทันที!
+        window.addEventListener('blur', () => {
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (active && active.tagName === 'IFRAME' && active.classList.contains('yt-video-frame')) {
+                    if (isGlobalMuted) {
+                        isGlobalMuted = false;
+                        window.soundPromptDismissed = true;
+                        hidePrompt();
+                        
+                        Object.values(window.ytPlayers).forEach(player => {
+                            try {
+                                if (typeof player.unMute === 'function') {
+                                    player.unMute();
+                                }
+                            } catch(e) {}
+                        });
+                    }
+                }
+            }, 100);
+        });
+
         let bttTimeout;
         window.addEventListener('scroll', () => {
             const btt = document.getElementById('back-to-top');
@@ -358,7 +385,6 @@
 
             const iframes = document.querySelectorAll('iframe.yt-video-frame');
             iframes.forEach((iframe) => {
-                // สร้างไอดีเฉพาะให้ iframe หากยังไม่มี
                 if (!iframe.id) iframe.id = `yt-player-${Math.random().toString(36).substr(2, 9)}`;
                 
                 if (!window.ytPlayers[iframe.id]) {
@@ -366,12 +392,21 @@
                         window.ytPlayers[iframe.id] = new YT.Player(iframe.id, {
                             events: {
                                 'onReady': (event) => {
-                                    // การันตีปิดเสียงเพื่อให้ Autoplay ทำงานได้บนเบราว์เซอร์ใหม่ๆ
-                                    event.target.mute(); 
-                                    event.target.playVideo();
+                                    // ถ้าเปิดเว็บมาครั้งแรก ให้แน่ใจว่า Mute ไว้เพื่อบังคับ Autoplay ทะลุกฎเบราว์เซอร์
+                                    if (isGlobalMuted) {
+                                        event.target.mute(); 
+                                    } else {
+                                        event.target.unMute();
+                                    }
+                                    event.target.playVideo(); // บังคับให้เล่น
                                     window.updateSoundPromptVisibility();
                                 },
-                                'onStateChange': () => {
+                                'onStateChange': (event) => {
+                                    // หากเราตรวจพบว่าวิดีโอเล่นอยู่แล้วไม่ได้โดนปิดเสียง (กดเปิดเสียงที่ปุ่มใน YouTube)
+                                    if (isGlobalMuted && event.data === 1 && !event.target.isMuted()) {
+                                        isGlobalMuted = false;
+                                        window.soundPromptDismissed = true;
+                                    }
                                     window.updateSoundPromptVisibility();
                                 }
                             }
@@ -392,8 +427,8 @@
             let isAnyMutedAndPlaying = false;
             Object.values(window.ytPlayers).forEach(player => {
                 try {
+                    // ตรวจสอบว่ามีวิดีโอตัวไหน "กำลังเล่น" (State 1) และ "ถูกปิดเสียงอยู่"
                     if (typeof player.getPlayerState === 'function') {
-                        // State 1 = Playing
                         if (player.getPlayerState() === 1 && player.isMuted()) {
                             isAnyMutedAndPlaying = true;
                         }
@@ -404,6 +439,7 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
+            // จะแสดงป็อปอัพ "แตะเพื่อเปิดเสียง" ก็ต่อเมื่อวิดีโอกำลังเล่นอัตโนมัติอยู่จริงๆ
             if (isAnyMutedAndPlaying) {
                 soundControls.classList.remove('hidden');
                 setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
@@ -430,8 +466,7 @@
             window.soundPromptDismissed = true;
             
             hidePrompt();
-            window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
-
+            
             let firstPlayingIframe = null;
 
             Object.values(window.ytPlayers).forEach(player => {
@@ -508,27 +543,25 @@
             });
         };
 
-        // --- แก้ไขการดึงลิงก์ YouTube ให้รองรับ Autoplay ---
         const getEmbedUrl = (url) => {
             if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) {
-                // บังคับ mute=1 เสมอเพื่อให้เบราว์เซอร์ยอมออโต้เพลย์ 
+                // บังคับ mute=1 เสมอในการโหลดครั้งแรกเพื่อให้เบราว์เซอร์ยอมเล่นอัตโนมัติ (Autoplay)
                 const originUrl = encodeURIComponent(window.location.origin);
                 return `https://www.youtube.com/embed/${match[2]}?enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&origin=${originUrl}&vq=hd1080`;
             }
             return null;
         };
 
-        // การเปิด/ปิด Modal ใช้ระบบ Lock Scroll หมด
         window.openLightbox = (url) => {
             document.getElementById('lightbox-img').src = url;
             const lb = document.getElementById('lightbox-modal');
             lb.classList.remove('hidden');
             lb.classList.add('flex');
             setTimeout(() => lb.classList.remove('opacity-0'), 10);
-            window.lockScroll(); // ล็อกการเลื่อน
+            window.lockScroll(); // ล็อกหน้าจอทันทีเมื่อเปิดรูป
         };
 
         window.closeLightbox = () => {
@@ -538,7 +571,7 @@
                 lb.classList.add('hidden');
                 lb.classList.remove('flex');
                 document.getElementById('lightbox-img').src = '';
-                window.unlockScroll(); // ปลดล็อก
+                window.unlockScroll(); // คืนค่าการเลื่อนเมื่อปิดรูป
             }, 300);
         };
 
@@ -624,8 +657,7 @@
                             </div>
                             <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
                                 ${embedUrl ? 
-                                    `<!-- เพิ่ม allow=\"autoplay; fullscreen\" ให้รองรับสมบูรณ์ -->
-                                     <iframe id=\"yt-${link.id}\" class=\"w-full h-full yt-video-frame\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen></iframe>` : 
+                                    `<iframe id=\"yt-${link.id}\" class=\"w-full h-full yt-video-frame\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen></iframe>` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
                                         <a href=\"${link.url}\" target=\"_blank\" class=\"text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full\">Watch on YouTube</a>
@@ -1089,7 +1121,7 @@
             height: 0;
             background-color: white;
             transform: translate(-50%, -50%);
-            z-index: 99999; /* Updated Z-index */
+            z-index: 99999;
             opacity: 0;
             transition: height 0.8s cubic-bezier(0.65, 0, 0.35, 1), width 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease, left 0.8s cubic-bezier(0.65, 0, 0.35, 1);
             pointer-events: none;
@@ -1135,7 +1167,7 @@
 </head>
 <body class="min-h-screen custom-scrollbar">
 
-    <!-- SPLASH SCREEN - Updated Z-index to cover Admin Login properly -->
+    <!-- SPLASH SCREEN -->
     <div id="splash-screen" class="fixed inset-0 z-[99998] flex items-center justify-center pointer-events-none">
         <img id="splash-logo" src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Splash" class="max-h-20 md:max-h-28 w-auto object-contain animate-splash" style="top: 50%; left: 50%;">
     </div>
@@ -1227,7 +1259,7 @@
         </div>
     </div>
 
-    <!-- ADMIN LOGIN - Z-index updated to sit below toasts but above page content -->
+    <!-- ADMIN LOGIN -->
     <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[4000]">
         <div class="w-[90vw] max-w-sm bg-zinc-900/20 border border-zinc-900 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-16 w-auto mx-auto mb-10 object-contain opacity-50 block">
