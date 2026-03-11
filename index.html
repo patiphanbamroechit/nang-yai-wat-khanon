@@ -12,19 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- YouTube Iframe API Scripts -->
-    <script>
-        window.ytPlayers = {};
-        window.ytApiReady = false;
-        window.onYouTubeIframeAPIReady = function() {
-            window.ytApiReady = true;
-            if (typeof window.initYTPlayers === 'function') {
-                window.initYTPlayers();
-            }
-        };
-    </script>
-    <script src="https://www.youtube.com/iframe_api"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -56,14 +43,16 @@
         let isInitialLoad = true; 
         let isAdminAuthorized = sessionStorage.getItem('isAdminAuthorized') === 'true';
         let isGlobalMuted = true; 
-        window.soundPromptDismissed = false;
-        window.hidePromptTimeout = null;
         const ADMIN_PASSWORD = "Pluk65030138";
+
+        // Track visible videos for sound prompt logic
+        const visibleVideos = new Set();
+        let videoObserver = null;
 
         // Analytics Listeners State
         let analyticsListenerUnsubscribe = null;
         let logsListenerUnsubscribe = null;
-        window.currentLogsData = [];
+        window.currentLogsData = []; // เก็บไว้สำหรับ Export CSV
 
         const viewerPage = document.getElementById('viewer-page');
         const adminPage = document.getElementById('admin-page');
@@ -74,28 +63,6 @@
         const addLinkForm = document.getElementById('add-link-form');
         const editModal = document.getElementById('edit-modal');
         const siteStatusBtn = document.getElementById('site-status-toggle');
-
-        // --- Global Scroll Lock System ---
-        let scrollPosition = 0;
-        window.lockScroll = () => {
-            scrollPosition = window.scrollY;
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
-            document.body.style.position = 'fixed';
-            document.body.style.top = `-${scrollPosition}px`;
-            document.body.style.width = '100%';
-            document.body.style.left = '0';
-        };
-
-        window.unlockScroll = () => {
-            document.body.style.removeProperty('overflow');
-            document.documentElement.style.removeProperty('overflow');
-            document.body.style.removeProperty('position');
-            document.body.style.removeProperty('top');
-            document.body.style.removeProperty('width');
-            document.body.style.removeProperty('left');
-            window.scrollTo(0, scrollPosition);
-        };
 
         // Global Toast Notification System
         window.toastTimeout = null;
@@ -255,36 +222,17 @@
             document.body.style.overflow = 'hidden';
 
             setTimeout(() => {
-                let targetRect = mainLogo.getBoundingClientRect();
-                
-                // หากหน้าหลักถูกซ่อนอยู่ (เช่น อยู่หน้าแอดมิน) ให้เปิดชั่วคราวเพื่อคำนวณตำแหน่งอย่างแม่นยำ
-                if (targetRect.width === 0) {
-                    viewerPage.style.visibility = 'hidden';
-                    viewerPage.classList.remove('hidden');
-                    
-                    targetRect = mainLogo.getBoundingClientRect();
-                    
-                    viewerPage.classList.add('hidden');
-                    viewerPage.style.visibility = '';
-                }
-                
+                const targetRect = mainLogo.getBoundingClientRect();
                 const splashRect = splashLogo.getBoundingClientRect();
                 
-                let deltaX = 0;
-                let deltaY = 0;
-                let scale = 1;
-                let lineXPos = window.innerWidth / 2;
-
-                if (targetRect.width > 0) {
-                    deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
-                    deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
-                    scale = targetRect.width / splashRect.width;
-                    lineXPos = targetRect.left + (targetRect.width * 0.396);
-                }
+                const deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
+                const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
+                const scale = targetRect.width / splashRect.width;
 
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
+                    const lineXPos = targetRect.left + (targetRect.width * 0.396);
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineXPos + 'px';
                     transitionOverlay.style.width = '3px';
@@ -302,7 +250,7 @@
                         setTimeout(() => {
                             appContent.style.transition = 'none';
                             appContent.style.opacity = "1";
-                            if (targetRect.width > 0) mainLogo.style.opacity = "1";
+                            mainLogo.style.opacity = "1";
                             
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
@@ -317,17 +265,6 @@
                                 document.body.style.overflowY = 'auto'; 
                                 document.body.style.overflowX = 'hidden';
                                 window.scrollTo(0, 0);
-
-                                // --- Force Play After Splash Screen ---
-                                Object.values(window.ytPlayers).forEach(player => {
-                                    try {
-                                        if (typeof player.playVideo === 'function') {
-                                            if (isGlobalMuted) player.mute();
-                                            player.playVideo();
-                                        }
-                                    } catch(e) {}
-                                });
-
                             }, 1200);
                         }, 800);
                     }, 600);
@@ -335,42 +272,8 @@
             }, 2500); 
         });
 
-        // ดักจับเวลาผู้ใช้แตะ YouTube โดยตรง (โหมดประหยัดพลังงานกรณีหลุดรอด) เพื่อคลายการบล็อกเสียงอัตโนมัติ
-        window.addEventListener('blur', () => {
-            setTimeout(() => {
-                const active = document.activeElement;
-                if (active && active.tagName === 'IFRAME' && active.src && active.src.includes('youtube')) {
-                    if (isGlobalMuted) {
-                        isGlobalMuted = false;
-                        window.soundPromptDismissed = true;
-                        hidePrompt();
-                        document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
-                        
-                        Object.values(window.ytPlayers).forEach(player => {
-                            try { 
-                                if (typeof player.unMute === 'function') {
-                                    player.unMute(); 
-                                    player.setVolume(100);
-                                    const state = player.getPlayerState();
-                                    if (state === 1 || state === 2 || state === 3) {
-                                        player.seekTo(0, true);
-                                        player.playVideo();
-                                    }
-                                }
-                            } catch(e) {}
-                        });
-                    }
-                }
-            }, 100);
-        });
-
         let bttTimeout;
         window.addEventListener('scroll', () => {
-            // ระบบตรวจจับอัปเดตป๊อปอัพทันทีที่เกิดการเลื่อนหน้าจอ
-            if (!window.soundPromptDismissed && document.querySelectorAll('.yt-video-wrapper').length > 0) {
-                window.updateSoundPromptVisibility();
-            }
-
             const btt = document.getElementById('back-to-top');
             if(window.scrollY > 400) {
                 btt.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4', 'opacity-40');
@@ -413,222 +316,45 @@
             }
         };
 
-        // --- YouTube API Management with Intersection Observer ---
-        window.initYTPlayers = () => {
-            if (!window.ytApiReady || typeof YT === 'undefined' || !YT.Player) return;
-
-            if (window.ytObserver) window.ytObserver.disconnect();
-            
-            window.ytPlayers = {}; 
-            
-            window.ytObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    const ytId = entry.target.getAttribute('data-yt-id');
-                    if (!ytId) return;
-                    const player = window.ytPlayers[ytId];
-                    
-                    if (entry.isIntersecting) {
-                        if (player && typeof player.playVideo === 'function') {
-                            if (isGlobalMuted && typeof player.mute === 'function') player.mute(); 
-                            player.playVideo();
-                        }
-                    } else {
-                        if (player && typeof player.pauseVideo === 'function') {
-                            player.pauseVideo();
-                        }
-                    }
-                });
-            }, { threshold: 0.3 });
-
-            const wrappers = document.querySelectorAll('.yt-video-wrapper');
-            wrappers.forEach(wrapper => {
-                const placeholder = wrapper.querySelector('.yt-video-placeholder');
-                if (placeholder) {
-                    const ytId = placeholder.id;
-                    const videoId = placeholder.getAttribute('data-video-id');
-                    
-                    wrapper.setAttribute('data-yt-id', ytId);
-                    window.ytObserver.observe(wrapper);
-
-                    try {
-                        window.ytPlayers[ytId] = new YT.Player(ytId, {
-                            videoId: videoId,
-                            width: '100%',
-                            height: '100%',
-                            playerVars: {
-                                'autoplay': 1,
-                                'mute': 1,
-                                'playsinline': 1,
-                                'rel': 0,
-                                'modestbranding': 1,
-                                'vq': 'hd1080'
-                            },
-                            events: {
-                                'onReady': (event) => {
-                                    event.target.setVolume(100);
-                                    if (isGlobalMuted) event.target.mute();
-                                    else event.target.unMute();
-                                },
-                                'onStateChange': (event) => {
-                                    const state = event.data;
-                                    const isMuted = event.target.isMuted();
-                                    
-                                    // หากผู้ใช้มีวิธีกดเล่นจากปุ่ม Native ของ YT เอง (หลุดรอดไปได้)
-                                    if (isGlobalMuted && state === 1 && !isMuted) {
-                                        isGlobalMuted = false;
-                                        window.soundPromptDismissed = true;
-                                        hidePrompt();
-                                        document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
-                                    }
-
-                                    // บังคับเปิดเสียงทันทีถ้าระบบเสียงหลักถูกเปิดแล้ว
-                                    if (!isGlobalMuted && state === 1 && isMuted) {
-                                        event.target.unMute();
-                                        event.target.setVolume(100);
-                                    }
-                                    
-                                    window.updateSoundPromptVisibility();
-                                }
-                            }
-                        });
-                    } catch(e) {
-                        console.error("YT Player init error", e);
-                    }
-                }
-            });
-        };
-
-        window.handleVideoTap = (ytId) => {
-            isGlobalMuted = false;
-            window.soundPromptDismissed = true;
-            hidePrompt(); 
-            
-            // ซ่อนแผ่นใสทั้งหมด เพื่อให้ผู้ใช้กดควบคุมวิดีโอ (หยุด/ข้าม) ได้ปกติ
-            document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
-
-            Object.keys(window.ytPlayers).forEach(id => {
-                const player = window.ytPlayers[id];
-                try {
-                    if (typeof player.unMute === 'function') {
-                        player.unMute();
-                        player.setVolume(100);
-                    }
-                    if (id === ytId && typeof player.playVideo === 'function') {
-                        // สั่งให้กลับไปที่ 0 วินาทีและเล่นเฉพาะวิดีโอที่ถูกจิ้ม
-                        player.seekTo(0, true);
-                        player.playVideo(); 
-                    }
-                } catch(e) {}
-            });
-            
-            window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
-        };
-
-        // --- ระบบอัปเดตป๊อปอัพเสียง (บังคับตรวจสอบอย่างเข้มงวด) ---
         window.updateSoundPromptVisibility = () => {
-            if (window.soundPromptDismissed) {
-                hidePrompt();
-                return;
-            }
-
-            let isAnyVisibleAndPlayingMuted = false;
-            Object.keys(window.ytPlayers).forEach(id => {
-                const player = window.ytPlayers[id];
-                try {
-                    if (typeof player.getPlayerState === 'function') {
-                        const state = player.getPlayerState();
-                        // บังคับเช็คแค่ว่ากำลังเล่น (1) หรือกำลังโหลด (3) และถูกปิดเสียงอยู่ (ถอดการเช็คเวลาออกทั้งหมด)
-                        if ((state === 1 || state === 3) && player.isMuted()) {
-                            const wrapper = document.querySelector(`[data-yt-id="${id}"]`);
-                            if (wrapper) {
-                                const rect = wrapper.getBoundingClientRect();
-                                // ขยายขอบเขตการคำนวณหน้าจอ (+200px) ป้องกันมือถือคำนวณขอบเขตพลาด
-                                if (rect.top < (window.innerHeight || document.documentElement.clientHeight) + 200 && rect.bottom > -200) {
-                                    isAnyVisibleAndPlayingMuted = true;
-                                }
-                            }
-                        }
-                    }
-                } catch(e){}
-            });
-
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
-
-            // บังคับโชว์ป๊อปอัพทันทีที่พบวิดีโอเล่นแต่ไม่มีเสียง
-            if (isAnyVisibleAndPlayingMuted && isGlobalMuted) {
-                if (window.hidePromptTimeout) {
-                    clearTimeout(window.hidePromptTimeout);
-                    window.hidePromptTimeout = null;
-                }
-                
+            
+            // ปรากฏเมื่อมีวิดีโอที่กำลังเล่นแบบปิดเสียง (Autoplay-Muted) อยู่บนจอ และผู้ใช้ยังไม่ได้กดปุ่มเปิดเสียงถาวร
+            if (visibleVideos.size > 0 && isGlobalMuted) {
                 soundControls.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    soundPrompt.classList.remove('translate-y-10', 'opacity-0');
-                    soundPrompt.classList.add('translate-y-0', 'opacity-100');
-                }, 50);
+                setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
             } else {
-                hidePrompt();
+                soundPrompt.classList.add('opacity-0', 'translate-y-10');
+                setTimeout(() => soundControls.classList.add('hidden'), 500);
             }
         };
-
-        function hidePrompt() {
-            const soundControls = document.getElementById('global-sound-controls');
-            const soundPrompt = document.getElementById('sound-prompt');
-            
-            soundPrompt.classList.remove('translate-y-0', 'opacity-100');
-            soundPrompt.classList.add('opacity-0', 'translate-y-10');
-            
-            if (window.hidePromptTimeout) {
-                clearTimeout(window.hidePromptTimeout);
-            }
-            
-            window.hidePromptTimeout = setTimeout(() => {
-                soundControls.classList.add('hidden');
-            }, 600);
-        }
-
-        // เสริมความปลอดภัยด้วยการเช็คซ้ำทุกๆ 500ms (เร็วขึ้นเพื่อให้ป๊อปอัพตอบสนองทันที)
-        setInterval(() => {
-            if (document.querySelectorAll('.yt-video-wrapper').length > 0 && !window.soundPromptDismissed) {
-                window.updateSoundPromptVisibility();
-            }
-        }, 500);
 
         window.enableSound = () => {
             isGlobalMuted = false;
             window.soundPromptDismissed = true;
             
-            hidePrompt();
-            document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
-            
-            let firstPlayingIframe = null;
+            const soundControls = document.getElementById('global-sound-controls');
+            const soundPrompt = document.getElementById('sound-prompt');
 
-            Object.values(window.ytPlayers).forEach(player => {
-                try {
-                    if (typeof player.unMute === 'function') {
-                        player.unMute();
-                        player.setVolume(100);
-                        
-                        // รีสตาร์ท (seek ไปที่ 0) เฉพาะวิดีโอที่กำลังเล่นอยู่ (State = 1) เท่านั้น
-                        if (player.getPlayerState() === 1) {
-                            player.seekTo(0, true);
-                            player.playVideo();
-                            
-                            if (!firstPlayingIframe) {
-                                firstPlayingIframe = player.getIframe();
-                            }
-                        }
-                    }
-                } catch(e) {}
+            soundPrompt.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                soundControls.classList.add('hidden');
+                window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
+            }, 500);
+
+            const iframes = document.querySelectorAll('.video-iframe');
+            let firstIframe = null;
+            
+            iframes.forEach(iframe => {
+                if (iframe.src && iframe.src.includes('mute=1')) {
+                    iframe.src = iframe.src.replace('mute=1', 'mute=0');
+                    if (!firstIframe) firstIframe = iframe;
+                }
             });
 
-            window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
-
-            // โฟกัสวิดีโอที่กำลังเล่นอยู่ให้อยู่กึ่งกลางจอ
-            if (firstPlayingIframe) {
-                const container = firstPlayingIframe.closest('.reveal-item') || firstPlayingIframe;
+            if (firstIframe) {
+                const container = firstIframe.closest('.reveal-item') || firstIframe;
                 container.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         };
@@ -690,11 +416,22 @@
             });
         };
 
-        const getVideoId = (url) => {
+        const getEmbedUrl = (url, autoplay = true) => {
             if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : null;
+            if (match && match[2].length === 11) {
+                const origin = window.location.origin;
+                const videoId = match[2];
+                if (autoplay) {
+                    const muteParam = isGlobalMuted ? 1 : 0;
+                    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
+                } else {
+                    // แบบปกติ (Manual Play) จะไม่มี autoplay=1 และ mute=1
+                    return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
+                }
+            }
+            return null;
         };
 
         window.openLightbox = (url) => {
@@ -703,7 +440,8 @@
             lb.classList.remove('hidden');
             lb.classList.add('flex');
             setTimeout(() => lb.classList.remove('opacity-0'), 10);
-            window.lockScroll();
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.closeLightbox = () => {
@@ -713,7 +451,8 @@
                 lb.classList.add('hidden');
                 lb.classList.remove('flex');
                 document.getElementById('lightbox-img').src = '';
-                window.unlockScroll(); 
+                document.body.style.overflow = '';
+                document.documentElement.style.overflow = '';
             }, 300);
         };
 
@@ -753,9 +492,30 @@
             });
         };
 
+        const initVideoObserver = () => {
+            if (videoObserver) videoObserver.disconnect();
+            
+            videoObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const videoId = entry.target.dataset.videoId;
+                    if (entry.isIntersecting) {
+                        visibleVideos.add(videoId);
+                    } else {
+                        visibleVideos.delete(videoId);
+                    }
+                });
+                window.updateSoundPromptVisibility();
+            }, { threshold: 0.2 });
+
+            document.querySelectorAll('.autoplay-video').forEach(el => {
+                videoObserver.observe(el);
+            });
+        };
+
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
-
+            visibleVideos.clear(); // Reset visible set before re-render
+            
             if (visibleLinks.length === 0) {
                 if (isInitialLoad) {
                     linksContainer.innerHTML = '<div class=\"animate-pulse space-y-10\"><div class=\"h-48 bg-zinc-900 rounded-2xl opacity-10\"></div></div>';
@@ -768,7 +528,6 @@
             linksContainer.innerHTML = visibleLinks.map((link, index) => {
                 const delay = (index * 0.15) + 0.5;
                 const descHtml = link.description ? `<p class=\"text-zinc-500 text-[10px] md:text-xs mt-3 leading-relaxed whitespace-pre-wrap text-left font-light\">${linkify(link.description)}</p>` : '';
-                
                 const safeTitle = (link.title || '').replace(/'/g, "\\'");
                 const shareBtnHtml = `<button onclick=\"window.shareContent('${link.url || ''}', '${safeTitle}')\" class=\"text-zinc-600 hover:text-red-500 transition-colors p-1 bg-zinc-900/50 rounded-lg border border-zinc-800\" title=\"แชร์\"><i data-lucide=\"share-2\" class=\"w-3.5 h-3.5\"></i></button>`;
 
@@ -789,22 +548,22 @@
                         </div>
                     `;
                 } else if (link.type === 'video') {
-                    const videoId = getVideoId(link.url);
+                    // เช็คว่าวิดีโอนี้ควรเล่นอัตโนมัติหรือไม่ (ในที่นี้เรากำหนดให้วิดีโอทั้งหมดเป็น Autoplay-Muted เพื่อความทันสมัย แต่จะขึ้นป๊อปอัพตามเงื่อนไขที่กำหนด)
+                    // หากต้องการให้บางวิดีโอ "ไม่เพล" ต้องส่งพารามิเตอร์ false เข้าไปใน getEmbedUrl
+                    const isAutoplay = true; 
+                    const embedUrl = getEmbedUrl(link.url, isAutoplay);
                     const ratio = link.ratio || '16/9';
-                    const ytId = `yt-player-${link.id}`; 
+                    const videoClass = isAutoplay ? 'video-iframe autoplay-video' : 'video-iframe';
+                    
                     return `
                         <div class=\"reveal-item w-full mb-14 text-left\" style=\"animation-delay: ${delay}s\">
                             <div class=\"flex items-center justify-between mb-2\">
                                 <h3 class=\"text-white text-[9px] md:text-[11px] font-medium opacity-80 uppercase tracking-wider\">${link.title}</h3>
                                 ${shareBtnHtml}
                             </div>
-                            <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl yt-video-wrapper\" data-yt-id="${ytId}" style=\"aspect-ratio: ${ratio}\">
-                                ${videoId ? 
-                                    `
-                                    <div id="${ytId}" class="w-full h-full yt-video-placeholder" data-video-id="${videoId}"></div>
-                                    <!-- นำ class hidden ออก เพื่อให้แผ่นใสดักจับการคลิกทุกครั้งที่มีการเปิดหน้าเว็บ -->
-                                    <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay flex items-center justify-center bg-transparent" onclick="window.handleVideoTap('${ytId}')"></div>
-                                    ` : 
+                            <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
+                                ${embedUrl ? 
+                                    `<iframe class=\"w-full h-full ${videoClass}\" data-video-id=\"${link.id}\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"autoplay; encrypted-media; picture-in-picture\" allowfullscreen></iframe>` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
                                         <a href=\"${link.url}\" target=\"_blank\" class=\"text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full\">Watch on YouTube</a>
@@ -848,14 +607,7 @@
             }).join('');
             
             lucide.createIcons();
-
-            setTimeout(() => {
-                if (typeof window.initYTPlayers === 'function') {
-                    window.initYTPlayers();
-                    // อัปเดตเช็คหน้าต่างอัตโนมัติเมื่อจัดเรียงกรอบวิดีโอเสร็จ
-                    window.updateSoundPromptVisibility();
-                }
-            }, 300);
+            initVideoObserver(); // เริ่มระบบสังเกตการณ์วิดีโอหลังเรนเดอร์เสร็จ
         };
 
         const renderAdminLinks = () => {
@@ -1035,7 +787,8 @@
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             
-            window.lockScroll();
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.closeAnalyticsSummary = () => {
@@ -1043,21 +796,24 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             
-            window.unlockScroll();
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         window.confirmClearAnalytics = () => {
             document.getElementById('clear-analytics-confirm').classList.remove('hidden');
             document.getElementById('clear-analytics-confirm').classList.add('flex');
             
-            window.lockScroll();
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
         
         window.closeClearAnalytics = () => {
             document.getElementById('clear-analytics-confirm').classList.add('hidden');
             document.getElementById('clear-analytics-confirm').classList.remove('flex');
             
-            window.unlockScroll();
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         window.executeClearAnalytics = async () => {
@@ -1104,14 +860,16 @@
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
             
-            window.lockScroll();
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.closeEditModal = () => {
             editModal.classList.add('hidden');
             editModal.classList.remove('flex');
             
-            window.unlockScroll();
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         document.getElementById('edit-form').onsubmit = async (e) => {
@@ -1160,7 +918,8 @@
             document.getElementById('custom-confirm').classList.add('hidden');
             document.getElementById('custom-confirm').classList.remove('flex');
             
-            window.unlockScroll();
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         window.deleteLink = async (id) => {
@@ -1168,7 +927,8 @@
             document.getElementById('custom-confirm').classList.remove('hidden');
             document.getElementById('custom-confirm').classList.add('flex');
             
-            window.lockScroll();
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.confirmDeleteAction = async () => {
@@ -1270,7 +1030,7 @@
             height: 0;
             background-color: white;
             transform: translate(-50%, -50%);
-            z-index: 99999;
+            z-index: 10005;
             opacity: 0;
             transition: height 0.8s cubic-bezier(0.65, 0, 0.35, 1), width 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease, left 0.8s cubic-bezier(0.65, 0, 0.35, 1);
             pointer-events: none;
@@ -1317,7 +1077,7 @@
 <body class="min-h-screen custom-scrollbar">
 
     <!-- SPLASH SCREEN -->
-    <div id="splash-screen" class="fixed inset-0 z-[99998] flex items-center justify-center pointer-events-none">
+    <div id="splash-screen" class="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none">
         <img id="splash-logo" src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Splash" class="max-h-20 md:max-h-28 w-auto object-contain animate-splash" style="top: 50%; left: 50%;">
     </div>
 
@@ -1333,7 +1093,7 @@
     </div>
 
     <!-- SMART SOUND PROMPT (Responsive Minimalist) -->
-    <div id="global-sound-controls" class="hidden fixed bottom-6 w-full px-4 left-0 z-[9990] pointer-events-none flex justify-center">
+    <div id="global-sound-controls" class="hidden fixed bottom-6 w-full px-4 left-0 z-[2000] pointer-events-none flex justify-center">
         <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-10 glass-panel px-4 py-2.5 md:px-5 md:py-3 rounded-full shadow-2xl flex items-center justify-between gap-3 md:gap-4 border border-zinc-700/50 w-max max-w-full">
             <div class="flex items-center gap-2 md:gap-2.5 shrink-0">
                 <i data-lucide="volume-x" class="w-3.5 h-3.5 md:w-4 md:h-4 text-red-400"></i>
@@ -1409,7 +1169,7 @@
     </div>
 
     <!-- ADMIN LOGIN -->
-    <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[4000]">
+    <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[10002]">
         <div class="w-[90vw] max-w-sm bg-zinc-900/20 border border-zinc-900 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-16 w-auto mx-auto mb-10 object-contain opacity-50 block">
             <h2 class="text-xs font-bold mb-8 tracking-[0.4em] uppercase text-red-900 border-t border-zinc-900 pt-8 text-center">Secure Vault</h2>
