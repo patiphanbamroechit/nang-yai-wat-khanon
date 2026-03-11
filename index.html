@@ -335,7 +335,7 @@
             }, 2500); 
         });
 
-        // ดักจับเวลาผู้ใช้แตะ YouTube โดยตรงแล้วเด้งไปแท็บอื่น (Fallback)
+        // ดักจับเวลาผู้ใช้แตะ YouTube โดยตรง (โหมดประหยัดพลังงาน) เพื่อคลายการบล็อกเสียงอัตโนมัติ
         window.addEventListener('blur', () => {
             setTimeout(() => {
                 const active = document.activeElement;
@@ -350,11 +350,7 @@
                             try { 
                                 if (typeof player.unMute === 'function') {
                                     player.unMute(); 
-                                    const state = player.getPlayerState();
-                                    if (state === 1 || state === 2 || state === 3 || state === -1 || player.getCurrentTime() > 0) {
-                                        player.seekTo(0);
-                                        player.playVideo();
-                                    }
+                                    player.setVolume(100);
                                 }
                             } catch(e) {}
                         });
@@ -428,7 +424,7 @@
                     
                     if (entry.isIntersecting) {
                         if (player && typeof player.playVideo === 'function') {
-                            if (isGlobalMuted) player.mute(); 
+                            if (isGlobalMuted && typeof player.mute === 'function') player.mute(); 
                             player.playVideo();
                         }
                     } else {
@@ -464,16 +460,30 @@
                             },
                             events: {
                                 'onReady': (event) => {
+                                    event.target.setVolume(100);
                                     if (isGlobalMuted) event.target.mute();
                                     else event.target.unMute();
                                 },
                                 'onStateChange': (event) => {
-                                    if (isGlobalMuted && event.data === 1 && !event.target.isMuted()) {
+                                    const state = event.data;
+                                    const isMuted = event.target.isMuted();
+                                    const overlay = document.getElementById('overlay-' + ytId);
+                                    
+                                    // แสดงแผ่นใสทับวิดีโอ (เพื่อให้ผู้ใช้แตะเปิดเสียงได้) "เฉพาะตอนที่วิดีโอกำลังเล่นและโดนปิดเสียงอยู่เท่านั้น"
+                                    if (state === 1 && isMuted) {
+                                        if (overlay) overlay.classList.remove('hidden');
+                                    } else {
+                                        if (overlay) overlay.classList.add('hidden');
+                                    }
+
+                                    // กรณีผู้ใช้กดเปิดเสียงจากปุ่มของ YouTube โดยตรง
+                                    if (isGlobalMuted && state === 1 && !isMuted) {
                                         isGlobalMuted = false;
                                         window.soundPromptDismissed = true;
                                         hidePrompt();
                                         document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
                                     }
+                                    
                                     window.updateSoundPromptVisibility();
                                 }
                             }
@@ -497,14 +507,10 @@
                 try {
                     if (typeof player.unMute === 'function') {
                         player.unMute();
-                        // สั่งให้กลับไปเริ่มใหม่เมื่อกดจาก Overlay
-                        const state = player.getPlayerState();
-                        if (state === 1 || state === 2 || state === 3 || state === -1 || player.getCurrentTime() > 0) {
-                            player.seekTo(0);
-                            player.playVideo();
-                        }
+                        player.setVolume(100);
                     }
                     if (id === ytId && typeof player.playVideo === 'function') {
+                        // สั่งให้กลับไปที่ 0 วินาทีและเล่นเฉพาะวิดีโอที่ถูกจิ้ม
                         player.seekTo(0);
                         player.playVideo(); 
                     }
@@ -514,28 +520,38 @@
             window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
         };
 
-        // --- ระบบอัปเดตป๊อปอัพเสียงแบบใหม่ (เน้นพิกัดหน้าจอแทนสถานะที่คลาดเคลื่อนง่าย) ---
+        // --- ระบบอัปเดตป๊อปอัพเสียง (เช็ค 2 ชั้น: วิดีโอเล่นอยู่จริงๆ + อยู่ในระยะสายตา) ---
         window.updateSoundPromptVisibility = () => {
             if (window.soundPromptDismissed) {
                 hidePrompt();
                 return;
             }
 
-            let isAnyVisible = false;
-            const wrappers = document.querySelectorAll('.yt-video-wrapper');
-            wrappers.forEach(wrapper => {
-                const rect = wrapper.getBoundingClientRect();
-                // เช็คว่ามีกรอบวิดีโอโผล่เข้ามาในขอบเขตหน้าจอมือถือหรือไม่
-                if (rect.top < window.innerHeight && rect.bottom > 0) {
-                    isAnyVisible = true;
-                }
+            let isAnyVisibleAndPlayingMuted = false;
+            Object.keys(window.ytPlayers).forEach(id => {
+                const player = window.ytPlayers[id];
+                try {
+                    if (typeof player.getPlayerState === 'function') {
+                        // เช็คว่า State คือ 1 (เล่นอยู่) และ isMuted เป็นจริง (ถ้าเป็นโหมดประหยัดพลังงาน State จะเป็น -1 ดังนั้นป๊อปอัพจะไม่ขึ้น)
+                        if (player.getPlayerState() === 1 && player.isMuted()) {
+                            const wrapper = document.querySelector(`[data-yt-id="${id}"]`);
+                            if (wrapper) {
+                                const rect = wrapper.getBoundingClientRect();
+                                // เช็คว่ามีกรอบวิดีโอโผล่เข้ามาในขอบเขตหน้าจอมือถือหรือไม่
+                                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                                    isAnyVisibleAndPlayingMuted = true;
+                                }
+                            }
+                        }
+                    }
+                } catch(e){}
             });
 
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            // ถ้ามีวิดีโออยู่ในจอและระบบเสียงรวมยังถูกปิดอยู่ จะแสดงป๊อปอัพเสมอ!
-            if (isAnyVisible && isGlobalMuted) {
+            // ถ้ามีวิดีโอกำลังเล่นอยู่ในหน้าจอ และระบบเสียงรวมยังปิดอยู่ -> แสดงป๊อปอัพ
+            if (isAnyVisibleAndPlayingMuted && isGlobalMuted) {
                 if (window.hidePromptTimeout) {
                     clearTimeout(window.hidePromptTimeout);
                     window.hidePromptTimeout = null;
@@ -568,7 +584,7 @@
             }, 600);
         }
 
-        // เสริมความปลอดภัยด้วยการเช็คซ้ำทุกๆ 800ms เผื่อมีการโหลด DOM แทรก
+        // เสริมความปลอดภัยด้วยการเช็คซ้ำทุกๆ 800ms
         setInterval(() => {
             if (document.querySelectorAll('.yt-video-wrapper').length > 0 && !window.soundPromptDismissed) {
                 window.updateSoundPromptVisibility();
@@ -588,16 +604,16 @@
                 try {
                     if (typeof player.unMute === 'function') {
                         player.unMute();
+                        player.setVolume(100);
                         
-                        // สั่งให้กลับไปเริ่มใหม่เมื่อกดเปิดเสียง
-                        const state = player.getPlayerState();
-                        if (state === 1 || state === 2 || state === 3 || state === -1 || player.getCurrentTime() > 0) {
+                        // รีสตาร์ท (seek ไปที่ 0) เฉพาะวิดีโอที่กำลังเล่นอยู่ (State = 1) เท่านั้น เพื่อไม่ให้วิดีโออื่นที่ยังไม่โหลดถูกกวน
+                        if (player.getPlayerState() === 1) {
                             player.seekTo(0);
                             player.playVideo();
-                        }
-                        
-                        if (player.getPlayerState() === 1 && !firstPlayingIframe) {
-                            firstPlayingIframe = player.getIframe();
+                            
+                            if (!firstPlayingIframe) {
+                                firstPlayingIframe = player.getIframe();
+                            }
                         }
                     }
                 } catch(e) {}
@@ -780,7 +796,7 @@
                                 ${videoId ? 
                                     `
                                     <div id="${ytId}" class="w-full h-full yt-video-placeholder" data-video-id="${videoId}"></div>
-                                    <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay flex items-center justify-center bg-transparent" onclick="window.handleVideoTap('${ytId}')"></div>
+                                    <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay flex items-center justify-center bg-transparent hidden" onclick="window.handleVideoTap('${ytId}')"></div>
                                     ` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
