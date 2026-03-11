@@ -12,6 +12,20 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- YouTube Iframe API Scripts -->
+    <script>
+        window.ytPlayers = [];
+        window.ytApiReady = false;
+        // ฟังก์ชันนี้จะถูกเรียกโดย YouTube อัตโนมัติเมื่อโหลด API เสร็จ
+        window.onYouTubeIframeAPIReady = function() {
+            window.ytApiReady = true;
+            if (typeof window.initYTPlayers === 'function') {
+                window.initYTPlayers();
+            }
+        };
+    </script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -48,7 +62,7 @@
         // Analytics Listeners State
         let analyticsListenerUnsubscribe = null;
         let logsListenerUnsubscribe = null;
-        window.currentLogsData = []; // เก็บไว้สำหรับ Export CSV
+        window.currentLogsData = [];
 
         const viewerPage = document.getElementById('viewer-page');
         const adminPage = document.getElementById('admin-page');
@@ -68,7 +82,6 @@
             const iconContainer = document.getElementById('global-toast-icon-container');
             const text = document.getElementById('global-toast-text');
 
-            // รีเซ็ตคลาส
             content.className = 'glass-panel px-5 py-2.5 rounded-full shadow-2xl flex items-center justify-center gap-3 border bg-black/80 backdrop-blur-md transition-colors duration-300';
             
             let iconName = 'info';
@@ -313,32 +326,100 @@
             }
         };
 
+        // --- YouTube API Management ---
+        window.initYTPlayers = () => {
+            if (!window.ytApiReady) return;
+            
+            // เคลียร์วิดีโอเก่า
+            window.ytPlayers.forEach(p => {
+                try { p.destroy(); } catch(e) {}
+            });
+            window.ytPlayers = [];
+
+            const iframes = document.querySelectorAll('iframe.yt-video-frame');
+            iframes.forEach((iframe, index) => {
+                if (!iframe.id) iframe.id = `yt-player-${Date.now()}-${index}`;
+                
+                try {
+                    const player = new YT.Player(iframe.id, {
+                        events: {
+                            'onReady': () => { window.updateSoundPromptVisibility(); },
+                            'onStateChange': () => { window.updateSoundPromptVisibility(); }
+                        }
+                    });
+                    window.ytPlayers.push(player);
+                } catch(e) {
+                    console.error("YT Player init error", e);
+                }
+            });
+        };
+
+        // แสดงป็อปอัพก็ต่อเมื่อ "มีวิดีโอกำลังเล่นอยู่" และ "ถูกปิดเสียงอยู่" เท่านั้น
+        window.updateSoundPromptVisibility = () => {
+            if (window.soundPromptDismissed) {
+                hidePrompt();
+                return;
+            }
+
+            let isAnyMutedAndPlaying = false;
+            window.ytPlayers.forEach(player => {
+                try {
+                    // YT.PlayerState.PLAYING = 1
+                    if (player.getPlayerState() === 1 && player.isMuted()) {
+                        isAnyMutedAndPlaying = true;
+                    }
+                } catch(e){}
+            });
+
+            const soundControls = document.getElementById('global-sound-controls');
+            const soundPrompt = document.getElementById('sound-prompt');
+
+            if (isAnyMutedAndPlaying) {
+                soundControls.classList.remove('hidden');
+                setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
+            } else {
+                hidePrompt();
+            }
+        };
+
+        function hidePrompt() {
+            const soundControls = document.getElementById('global-sound-controls');
+            const soundPrompt = document.getElementById('sound-prompt');
+            soundPrompt.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => soundControls.classList.add('hidden'), 500);
+        }
+
+        // ตรวจสอบสถานะวิดีโอทุกๆ 1 วินาที (ดักจับกรณีที่คนดูไปกดเปิด/ปิดเสียงจากปุ่ม YouTube เอง)
+        setInterval(() => {
+            if (window.ytPlayers && window.ytPlayers.length > 0 && !window.soundPromptDismissed) {
+                window.updateSoundPromptVisibility();
+            }
+        }, 1000);
+
         window.enableSound = () => {
             isGlobalMuted = false;
             window.soundPromptDismissed = true;
             
-            const soundControls = document.getElementById('global-sound-controls');
-            const soundPrompt = document.getElementById('sound-prompt');
+            hidePrompt();
+            window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
 
-            soundPrompt.classList.add('opacity-0', 'translate-y-10');
-            setTimeout(() => {
-                soundControls.classList.add('hidden');
-                window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
-            }, 500);
+            let firstPlayingIframe = null;
 
-            const iframes = document.querySelectorAll('iframe');
-            let firstIframe = null;
-            
-            iframes.forEach(iframe => {
-                if (iframe.src && iframe.src.includes('mute=1')) {
-                    iframe.src = iframe.src.replace('mute=1', 'mute=0');
-                    if (!firstIframe) firstIframe = iframe; // เก็บ iframe วิดีโอตัวแรกไว้
-                }
-            });
+            // สั่งเปิดเสียงผ่าน API ทันทีโดยไม่ต้องโหลดใหม่
+            if (window.ytPlayers.length > 0) {
+                window.ytPlayers.forEach(player => {
+                    try {
+                        player.unMute();
+                        if (player.getPlayerState() === 1 && !firstPlayingIframe) {
+                            firstPlayingIframe = player.getIframe();
+                        }
+                    } catch(e) {}
+                });
+            }
 
-            // เลื่อนหน้าจอไปยังวิดีโอตัวแรกที่เจอ
-            if (firstIframe) {
-                const container = firstIframe.closest('.reveal-item') || firstIframe;
+            // เลื่อนไปหาวิดีโอที่กำลังเล่นอยู่
+            if (firstPlayingIframe) {
+                const container = firstPlayingIframe.closest('.reveal-item') || firstPlayingIframe;
                 container.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         };
@@ -405,10 +486,10 @@
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) {
+                // เพิ่ม playsinline=1 เพื่อให้ iOS ยอมออโต้เพลย์
                 const muteParam = isGlobalMuted ? 1 : 0;
                 const origin = window.location.origin;
-                // เพิ่ม &vq=hd1080 เพื่อพยายามดันความละเอียดเป็น 1080p เป็นค่าเริ่มต้น
-                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
+                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
             }
             return null;
         };
@@ -463,10 +544,8 @@
             window.showToast('คัดลอกลิงก์เรียบร้อยแล้ว', 'copy');
         };
 
-        // ฟังก์ชันช่วยแปลงข้อความที่มี URL ให้เป็นแท็กลิงก์
         const linkify = (text) => {
             if (!text) return '';
-            // ค้นหาข้อความที่ขึ้นต้นด้วย http:// หรือ https://
             const urlRegex = /(https?:\/\/[^\s<]+)/g;
             return text.replace(urlRegex, function(url) {
                 return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-red-500 hover:text-red-400 underline transition-colors" onclick="event.stopPropagation()">${url}</a>`;
@@ -475,18 +554,6 @@
 
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
-            const hasVideo = visibleLinks.some(link => link.type === 'video');
-            
-            const soundControls = document.getElementById('global-sound-controls');
-            const soundPrompt = document.getElementById('sound-prompt');
-            
-            if (hasVideo && isGlobalMuted && !window.soundPromptDismissed) {
-                soundControls.classList.remove('hidden');
-                setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
-            } else {
-                soundPrompt.classList.add('opacity-0', 'translate-y-10');
-                setTimeout(() => soundControls.classList.add('hidden'), 500);
-            }
 
             if (visibleLinks.length === 0) {
                 if (isInitialLoad) {
@@ -499,7 +566,6 @@
 
             linksContainer.innerHTML = visibleLinks.map((link, index) => {
                 const delay = (index * 0.15) + 0.5;
-                // นำ link.description ไปผ่านฟังก์ชัน linkify ก่อนแสดงผล
                 const descHtml = link.description ? `<p class=\"text-zinc-500 text-[10px] md:text-xs mt-3 leading-relaxed whitespace-pre-wrap text-left font-light\">${linkify(link.description)}</p>` : '';
                 
                 const safeTitle = (link.title || '').replace(/'/g, "\\'");
@@ -532,7 +598,7 @@
                             </div>
                             <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
                                 ${embedUrl ? 
-                                    `<iframe class=\"w-full h-full\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"autoplay; encrypted-media; picture-in-picture\" allowfullscreen></iframe>` : 
+                                    `<iframe class=\"w-full h-full yt-video-frame\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"autoplay; fullscreen; picture-in-picture\" allowfullscreen></iframe>` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
                                         <a href=\"${link.url}\" target=\"_blank\" class=\"text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full\">Watch on YouTube</a>
@@ -576,6 +642,13 @@
             }).join('');
             
             lucide.createIcons();
+
+            // สั่งเชื่อมต่อ YouTube API หลังจาก Render องค์ประกอบต่างๆ ลงหน้าเว็บแล้ว 300ms
+            setTimeout(() => {
+                if (typeof window.initYTPlayers === 'function') {
+                    window.initYTPlayers();
+                }
+            }, 300);
         };
 
         const renderAdminLinks = () => {
