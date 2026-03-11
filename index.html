@@ -15,9 +15,8 @@
 
     <!-- YouTube Iframe API Scripts -->
     <script>
-        window.ytPlayers = [];
+        window.ytPlayers = {};
         window.ytApiReady = false;
-        // ฟังก์ชันนี้จะถูกเรียกโดย YouTube อัตโนมัติเมื่อโหลด API เสร็จ
         window.onYouTubeIframeAPIReady = function() {
             window.ytApiReady = true;
             if (typeof window.initYTPlayers === 'function') {
@@ -73,6 +72,24 @@
         const addLinkForm = document.getElementById('add-link-form');
         const editModal = document.getElementById('edit-modal');
         const siteStatusBtn = document.getElementById('site-status-toggle');
+
+        // --- Global Scroll Lock System (แก้ปัญหาพื้นหลังเลื่อนได้ 100%) ---
+        let scrollPosition = 0;
+        window.lockScroll = () => {
+            scrollPosition = window.scrollY;
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollPosition}px`;
+            document.body.style.width = '100%';
+        };
+
+        window.unlockScroll = () => {
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('position');
+            document.body.style.removeProperty('top');
+            document.body.style.removeProperty('width');
+            window.scrollTo(0, scrollPosition);
+        };
 
         // Global Toast Notification System
         window.toastTimeout = null;
@@ -235,14 +252,23 @@
                 const targetRect = mainLogo.getBoundingClientRect();
                 const splashRect = splashLogo.getBoundingClientRect();
                 
-                const deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
-                const deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
-                const scale = targetRect.width / splashRect.width;
+                let deltaX = 0;
+                let deltaY = 0;
+                let scale = 1;
+                let lineXPos = window.innerWidth / 2;
+
+                if (targetRect.width > 0) {
+                    deltaX = (targetRect.left + targetRect.width / 2) - (window.innerWidth / 2);
+                    deltaY = (targetRect.top + targetRect.height / 2) - (window.innerHeight / 2);
+                    scale = targetRect.width / splashRect.width;
+                    lineXPos = targetRect.left + (targetRect.width * 0.396);
+                } else {
+                    scale = 1.1; 
+                }
 
                 splashLogo.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(${scale})`;
                 
                 setTimeout(() => {
-                    const lineXPos = targetRect.left + (targetRect.width * 0.396);
                     transitionOverlay.style.transition = 'none';
                     transitionOverlay.style.left = lineXPos + 'px';
                     transitionOverlay.style.width = '3px';
@@ -260,7 +286,7 @@
                         setTimeout(() => {
                             appContent.style.transition = 'none';
                             appContent.style.opacity = "1";
-                            mainLogo.style.opacity = "1";
+                            if (targetRect.width > 0) mainLogo.style.opacity = "1";
                             
                             splash.style.display = 'none';
                             splashLogo.style.display = 'none';
@@ -326,35 +352,37 @@
             }
         };
 
-        // --- YouTube API Management ---
+        // --- แก้ไขระบบ YouTube API ---
         window.initYTPlayers = () => {
-            if (!window.ytApiReady) return;
-            
-            // เคลียร์วิดีโอเก่า
-            window.ytPlayers.forEach(p => {
-                try { p.destroy(); } catch(e) {}
-            });
-            window.ytPlayers = [];
+            if (!window.ytApiReady || typeof YT === 'undefined' || !YT.Player) return;
 
             const iframes = document.querySelectorAll('iframe.yt-video-frame');
-            iframes.forEach((iframe, index) => {
-                if (!iframe.id) iframe.id = `yt-player-${Date.now()}-${index}`;
+            iframes.forEach((iframe) => {
+                // สร้างไอดีเฉพาะให้ iframe หากยังไม่มี
+                if (!iframe.id) iframe.id = `yt-player-${Math.random().toString(36).substr(2, 9)}`;
                 
-                try {
-                    const player = new YT.Player(iframe.id, {
-                        events: {
-                            'onReady': () => { window.updateSoundPromptVisibility(); },
-                            'onStateChange': () => { window.updateSoundPromptVisibility(); }
-                        }
-                    });
-                    window.ytPlayers.push(player);
-                } catch(e) {
-                    console.error("YT Player init error", e);
+                if (!window.ytPlayers[iframe.id]) {
+                    try {
+                        window.ytPlayers[iframe.id] = new YT.Player(iframe.id, {
+                            events: {
+                                'onReady': (event) => {
+                                    // การันตีปิดเสียงเพื่อให้ Autoplay ทำงานได้บนเบราว์เซอร์ใหม่ๆ
+                                    event.target.mute(); 
+                                    event.target.playVideo();
+                                    window.updateSoundPromptVisibility();
+                                },
+                                'onStateChange': () => {
+                                    window.updateSoundPromptVisibility();
+                                }
+                            }
+                        });
+                    } catch(e) {
+                        console.error("YT Player init error", e);
+                    }
                 }
             });
         };
 
-        // แสดงป็อปอัพก็ต่อเมื่อ "มีวิดีโอกำลังเล่นอยู่" และ "ถูกปิดเสียงอยู่" เท่านั้น
         window.updateSoundPromptVisibility = () => {
             if (window.soundPromptDismissed) {
                 hidePrompt();
@@ -362,11 +390,13 @@
             }
 
             let isAnyMutedAndPlaying = false;
-            window.ytPlayers.forEach(player => {
+            Object.values(window.ytPlayers).forEach(player => {
                 try {
-                    // YT.PlayerState.PLAYING = 1
-                    if (player.getPlayerState() === 1 && player.isMuted()) {
-                        isAnyMutedAndPlaying = true;
+                    if (typeof player.getPlayerState === 'function') {
+                        // State 1 = Playing
+                        if (player.getPlayerState() === 1 && player.isMuted()) {
+                            isAnyMutedAndPlaying = true;
+                        }
                     }
                 } catch(e){}
             });
@@ -389,9 +419,8 @@
             setTimeout(() => soundControls.classList.add('hidden'), 500);
         }
 
-        // ตรวจสอบสถานะวิดีโอทุกๆ 1 วินาที (ดักจับกรณีที่คนดูไปกดเปิด/ปิดเสียงจากปุ่ม YouTube เอง)
         setInterval(() => {
-            if (window.ytPlayers && window.ytPlayers.length > 0 && !window.soundPromptDismissed) {
+            if (Object.keys(window.ytPlayers).length > 0 && !window.soundPromptDismissed) {
                 window.updateSoundPromptVisibility();
             }
         }, 1000);
@@ -405,19 +434,17 @@
 
             let firstPlayingIframe = null;
 
-            // สั่งเปิดเสียงผ่าน API ทันทีโดยไม่ต้องโหลดใหม่
-            if (window.ytPlayers.length > 0) {
-                window.ytPlayers.forEach(player => {
-                    try {
+            Object.values(window.ytPlayers).forEach(player => {
+                try {
+                    if (typeof player.unMute === 'function') {
                         player.unMute();
                         if (player.getPlayerState() === 1 && !firstPlayingIframe) {
                             firstPlayingIframe = player.getIframe();
                         }
-                    } catch(e) {}
-                });
-            }
+                    }
+                } catch(e) {}
+            });
 
-            // เลื่อนไปหาวิดีโอที่กำลังเล่นอยู่
             if (firstPlayingIframe) {
                 const container = firstPlayingIframe.closest('.reveal-item') || firstPlayingIframe;
                 container.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -481,27 +508,27 @@
             });
         };
 
+        // --- แก้ไขการดึงลิงก์ YouTube ให้รองรับ Autoplay ---
         const getEmbedUrl = (url) => {
             if (!url) return null;
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) {
-                // เพิ่ม playsinline=1 เพื่อให้ iOS ยอมออโต้เพลย์
-                const muteParam = isGlobalMuted ? 1 : 0;
-                const origin = window.location.origin;
-                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
+                // บังคับ mute=1 เสมอเพื่อให้เบราว์เซอร์ยอมออโต้เพลย์ 
+                const originUrl = encodeURIComponent(window.location.origin);
+                return `https://www.youtube.com/embed/${match[2]}?enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&origin=${originUrl}&vq=hd1080`;
             }
             return null;
         };
 
+        // การเปิด/ปิด Modal ใช้ระบบ Lock Scroll หมด
         window.openLightbox = (url) => {
             document.getElementById('lightbox-img').src = url;
             const lb = document.getElementById('lightbox-modal');
             lb.classList.remove('hidden');
             lb.classList.add('flex');
             setTimeout(() => lb.classList.remove('opacity-0'), 10);
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            window.lockScroll(); // ล็อกการเลื่อน
         };
 
         window.closeLightbox = () => {
@@ -511,8 +538,7 @@
                 lb.classList.add('hidden');
                 lb.classList.remove('flex');
                 document.getElementById('lightbox-img').src = '';
-                document.body.style.overflow = '';
-                document.documentElement.style.overflow = '';
+                window.unlockScroll(); // ปลดล็อก
             }, 300);
         };
 
@@ -598,7 +624,8 @@
                             </div>
                             <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
                                 ${embedUrl ? 
-                                    `<iframe class=\"w-full h-full yt-video-frame\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"autoplay; fullscreen; picture-in-picture\" allowfullscreen></iframe>` : 
+                                    `<!-- เพิ่ม allow=\"autoplay; fullscreen\" ให้รองรับสมบูรณ์ -->
+                                     <iframe id=\"yt-${link.id}\" class=\"w-full h-full yt-video-frame\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen></iframe>` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
                                         <a href=\"${link.url}\" target=\"_blank\" class=\"text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full\">Watch on YouTube</a>
@@ -643,12 +670,11 @@
             
             lucide.createIcons();
 
-            // สั่งเชื่อมต่อ YouTube API หลังจาก Render องค์ประกอบต่างๆ ลงหน้าเว็บแล้ว 300ms
             setTimeout(() => {
                 if (typeof window.initYTPlayers === 'function') {
                     window.initYTPlayers();
                 }
-            }, 300);
+            }, 500);
         };
 
         const renderAdminLinks = () => {
@@ -783,18 +809,15 @@
             window.showToast('ดาวน์โหลดไฟล์ CSV เรียบร้อย', 'success');
         };
 
-        // --- เพิ่มระบบดูสรุปข้อมูล Analytics ---
         window.openAnalyticsSummary = () => {
             if (window.currentLogsData.length === 0) {
                 window.showToast('ยังไม่มีข้อมูลสถิติ', 'info');
                 return;
             }
 
-            // จัดกลุ่มและนับจำนวนตาม UID
             const summaryMap = {};
             window.currentLogsData.forEach(log => {
                 if (!summaryMap[log.uid]) {
-                    // วิเคราะห์ Device เบื้องต้น
                     let parsedUa = log.userAgent;
                     let device = 'Unknown';
                     if(parsedUa.includes('iPhone')) device = 'iPhone';
@@ -812,7 +835,6 @@
                 }
             });
 
-            // แปลงเป็น Array แล้วเรียงจากจำนวนวิวมากไปน้อย
             const summaryArray = Object.keys(summaryMap).map(uid => ({ uid, ...summaryMap[uid] })).sort((a, b) => b.count - a.count);
 
             const tbody = document.getElementById('analytics-summary-tbody');
@@ -832,9 +854,7 @@
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             
-            // ล็อกหน้าเว็บด้านหลัง
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            window.lockScroll();
         };
 
         window.closeAnalyticsSummary = () => {
@@ -842,36 +862,29 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             
-            // ปลดล็อกหน้าเว็บ
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
+            window.unlockScroll();
         };
 
-        // --- เพิ่มระบบล้างข้อมูล Analytics ---
         window.confirmClearAnalytics = () => {
             document.getElementById('clear-analytics-confirm').classList.remove('hidden');
             document.getElementById('clear-analytics-confirm').classList.add('flex');
             
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            window.lockScroll();
         };
         
         window.closeClearAnalytics = () => {
             document.getElementById('clear-analytics-confirm').classList.add('hidden');
             document.getElementById('clear-analytics-confirm').classList.remove('flex');
             
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
+            window.unlockScroll();
         };
 
         window.executeClearAnalytics = async () => {
             if (!currentUser) return;
             try {
-                // 1. รีเซ็ต Summary Document
                 const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
                 await setDoc(summaryRef, { totalViews: 0, uniqueViewers: [] });
 
-                // 2. ลบ Visitor Logs ทั้งหมด (Batch Delete)
                 const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
                 const q = query(logsRef);
                 const snapshot = await getDocs(q);
@@ -882,10 +895,8 @@
                 });
                 await batch.commit();
 
-                // ปิด Modal และแจ้งเตือน
                 window.closeClearAnalytics();
                 
-                // เคลียร์ข้อมูลในหน่วยความจำ
                 window.currentLogsData = [];
                 document.getElementById('admin-visitor-logs').innerHTML = '<tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>';
 
@@ -912,16 +923,14 @@
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
             
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            window.lockScroll();
         };
 
         window.closeEditModal = () => {
             editModal.classList.add('hidden');
             editModal.classList.remove('flex');
             
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
+            window.unlockScroll();
         };
 
         document.getElementById('edit-form').onsubmit = async (e) => {
@@ -970,8 +979,7 @@
             document.getElementById('custom-confirm').classList.add('hidden');
             document.getElementById('custom-confirm').classList.remove('flex');
             
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
+            window.unlockScroll();
         };
 
         window.deleteLink = async (id) => {
@@ -979,8 +987,7 @@
             document.getElementById('custom-confirm').classList.remove('hidden');
             document.getElementById('custom-confirm').classList.add('flex');
             
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            window.lockScroll();
         };
 
         window.confirmDeleteAction = async () => {
@@ -1082,7 +1089,7 @@
             height: 0;
             background-color: white;
             transform: translate(-50%, -50%);
-            z-index: 10005;
+            z-index: 99999; /* Updated Z-index */
             opacity: 0;
             transition: height 0.8s cubic-bezier(0.65, 0, 0.35, 1), width 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease, left 0.8s cubic-bezier(0.65, 0, 0.35, 1);
             pointer-events: none;
@@ -1128,8 +1135,8 @@
 </head>
 <body class="min-h-screen custom-scrollbar">
 
-    <!-- SPLASH SCREEN -->
-    <div id="splash-screen" class="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none">
+    <!-- SPLASH SCREEN - Updated Z-index to cover Admin Login properly -->
+    <div id="splash-screen" class="fixed inset-0 z-[99998] flex items-center justify-center pointer-events-none">
         <img id="splash-logo" src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Splash" class="max-h-20 md:max-h-28 w-auto object-contain animate-splash" style="top: 50%; left: 50%;">
     </div>
 
@@ -1220,8 +1227,8 @@
         </div>
     </div>
 
-    <!-- ADMIN LOGIN -->
-    <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[10002]">
+    <!-- ADMIN LOGIN - Z-index updated to sit below toasts but above page content -->
+    <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[4000]">
         <div class="w-[90vw] max-w-sm bg-zinc-900/20 border border-zinc-900 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-16 w-auto mx-auto mb-10 object-contain opacity-50 block">
             <h2 class="text-xs font-bold mb-8 tracking-[0.4em] uppercase text-red-900 border-t border-zinc-900 pt-8 text-center">Secure Vault</h2>
