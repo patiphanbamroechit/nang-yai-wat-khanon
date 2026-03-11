@@ -56,6 +56,8 @@
         let isInitialLoad = true; 
         let isAdminAuthorized = sessionStorage.getItem('isAdminAuthorized') === 'true';
         let isGlobalMuted = true; 
+        window.soundPromptDismissed = false;
+        window.hidePromptTimeout = null;
         const ADMIN_PASSWORD = "Pluk65030138";
 
         // Analytics Listeners State
@@ -255,10 +257,13 @@
             setTimeout(() => {
                 let targetRect = mainLogo.getBoundingClientRect();
                 
+                // หากหน้าหลักถูกซ่อนอยู่ (เช่น อยู่หน้าแอดมิน) ให้เปิดชั่วคราวเพื่อคำนวณตำแหน่งอย่างแม่นยำ
                 if (targetRect.width === 0) {
                     viewerPage.style.visibility = 'hidden';
                     viewerPage.classList.remove('hidden');
+                    
                     targetRect = mainLogo.getBoundingClientRect();
+                    
                     viewerPage.classList.add('hidden');
                     viewerPage.style.visibility = '';
                 }
@@ -447,16 +452,13 @@
                                 'onReady': (event) => {
                                     if (isGlobalMuted) event.target.mute();
                                     else event.target.unMute();
-                                    window.updateSoundPromptVisibility();
                                 },
                                 'onStateChange': (event) => {
-                                    // หากวิดีโอเริ่มเล่น (1) และเราต้องการแสดง Pop-up
-                                    if (event.data === 1) {
-                                        if (isGlobalMuted && !event.target.isMuted()) {
-                                            isGlobalMuted = false;
-                                            window.soundPromptDismissed = true;
-                                            hidePrompt();
-                                        }
+                                    if (isGlobalMuted && event.data === 1 && !event.target.isMuted()) {
+                                        isGlobalMuted = false;
+                                        window.soundPromptDismissed = true;
+                                        hidePrompt();
+                                        document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
                                     }
                                     window.updateSoundPromptVisibility();
                                 }
@@ -499,7 +501,6 @@
             Object.values(window.ytPlayers).forEach(player => {
                 try {
                     if (typeof player.getPlayerState === 'function') {
-                        // 1 = Playing, isMuted() = true
                         if (player.getPlayerState() === 1 && player.isMuted()) {
                             isAnyMutedAndPlaying = true;
                         }
@@ -510,12 +511,19 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            if (isAnyMutedAndPlaying && !window.soundPromptDismissed) {
+            if (isAnyMutedAndPlaying) {
+                // เคลียร์ Timeout เก่าเพื่อป้องกันปัญหาการซ่อนที่ตกค้างและทับซ้อน
+                if (window.hidePromptTimeout) {
+                    clearTimeout(window.hidePromptTimeout);
+                    window.hidePromptTimeout = null;
+                }
+                
                 soundControls.classList.remove('hidden');
-                // ใช้ timeout สั้นๆ เพื่อให้คลาส hidden หายไปก่อนเริ่ม transition
+                
+                // ใช้ setTimeout ให้คิวรอ DOM อัปเดต state hidden ออกไปก่อนนิดนึง
                 setTimeout(() => {
                     soundPrompt.classList.remove('translate-y-10', 'opacity-0');
-                    soundPrompt.classList.add('opacity-100', 'translate-y-0');
+                    soundPrompt.classList.add('translate-y-0', 'opacity-100');
                 }, 50);
             } else {
                 hidePrompt();
@@ -525,19 +533,22 @@
         function hidePrompt() {
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
-            if (!soundPrompt) return;
             
+            // นำ class ที่ใช้แสดงผลออก และใส่ class ซ่อนกลับไป
+            soundPrompt.classList.remove('translate-y-0', 'opacity-100');
             soundPrompt.classList.add('opacity-0', 'translate-y-10');
-            soundPrompt.classList.remove('opacity-100', 'translate-y-0');
             
-            setTimeout(() => {
-                if (soundPrompt.classList.contains('opacity-0')) {
-                    soundControls.classList.add('hidden');
-                }
+            // เคลียร์การทำงานเก่าเพื่อป้องกันการซ่อนทับซ้อนถ้าผู้ใช้เลื่อนหน้าไวๆ
+            if (window.hidePromptTimeout) {
+                clearTimeout(window.hidePromptTimeout);
+            }
+            
+            // หน่วงเวลาให้ Transition Effect 0.6 วินาทีทำงานเสร็จก่อน แล้วค่อยซ่อนกล่องควบคุม
+            window.hidePromptTimeout = setTimeout(() => {
+                soundControls.classList.add('hidden');
             }, 600);
         }
 
-        // เช็คทุกวินาทีเผื่อสถานะเปลี่ยนเอง
         setInterval(() => {
             if (Object.keys(window.ytPlayers).length > 0 && !window.soundPromptDismissed) {
                 window.updateSoundPromptVisibility();
@@ -1167,6 +1178,14 @@
             z-index: 1; 
         }
 
+        @media (min-width: 768px) {
+            body::before {
+                width: 100%;
+                height: 500px;
+                background: radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.08) 50%, transparent 80%);
+            }
+        }
+
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
@@ -1178,6 +1197,7 @@
             box-sizing: border-box !important;
             max-width: 100% !important;
         }
+        input:focus, textarea:focus, select:focus { border-color: #450a0a !important; }
 
         #splash-screen { background-color: black; transition: opacity 1.2s ease-in-out; }
         #splash-logo {
@@ -1202,6 +1222,7 @@
             transition: height 0.8s cubic-bezier(0.65, 0, 0.35, 1), width 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease, left 0.8s cubic-bezier(0.65, 0, 0.35, 1);
             pointer-events: none;
             box-shadow: 0 0 40px rgba(255,255,255,0.6);
+            will-change: opacity, transform;
         }
 
         #app-content { 
@@ -1211,6 +1232,13 @@
             position: relative;
             z-index: 10; 
         }
+        #main-logo { opacity: 0; max-width: 80vw; }
+
+        @keyframes pulseLogo {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(15px); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: blur(0); }
+        }
+        .animate-splash { animation: pulseLogo 1s ease-out forwards; }
 
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(25px); filter: blur(5px); }
@@ -1222,15 +1250,14 @@
         }
 
         #sound-prompt {
-            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.6s ease-out;
-            will-change: transform, opacity;
+            transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
         
         .glass-panel {
-            background: rgba(15, 15, 15, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(15, 15, 15, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
     </style>
 </head>
@@ -1252,7 +1279,7 @@
         </div>
     </div>
 
-    <!-- SMART SOUND PROMPT -->
+    <!-- SMART SOUND PROMPT (Responsive Minimalist) -->
     <div id="global-sound-controls" class="hidden fixed bottom-6 w-full px-4 left-0 z-[2000] pointer-events-none flex justify-center">
         <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-10 glass-panel px-4 py-2.5 md:px-5 md:py-3 rounded-full shadow-2xl flex items-center justify-between gap-3 md:gap-4 border border-zinc-700/50 w-max max-w-full">
             <div class="flex items-center gap-2 md:gap-2.5 shrink-0">
@@ -1293,6 +1320,7 @@
                 <div id="links-container" class="space-y-12 max-w-[500px] w-full mx-auto pb-4"></div>
                 
                 <footer class="w-full py-8 flex flex-col items-center mt-10">
+                    <!-- User View Stats -->
                     <div class="flex justify-center items-center gap-4 text-[8px] tracking-[0.2em] uppercase font-light text-zinc-600 mb-6 border border-zinc-900/50 px-5 py-2.5 rounded-full bg-zinc-900/10">
                         <span>Views <b id="user-total-views" class="text-zinc-400 ml-1 font-medium">0</b></span>
                         <span class="w-px h-3 bg-zinc-800"></span>
@@ -1307,31 +1335,42 @@
         <!-- MAINTENANCE PAGE -->
         <div id="maintenance-page" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-center">
             <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-20 w-auto mb-10 opacity-10 grayscale object-contain">
+            
             <h2 class="text-red-900 text-xl md:text-2xl font-bold uppercase tracking-widest mb-0.5 text-center">หนังใหญ่ปิดทำการแสดง</h2>
+            <h3 class="text-red-900/60 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-6 text-center">Performance Temporarily Closed</h3>
+            
             <div class="space-y-2.5 max-w-xs mx-auto">
                 <p class="text-zinc-400 text-[11px] md:text-[13px] leading-relaxed font-light tracking-widest text-center">
                     กำลังปรับปรุงระบบ <br> โปรดกลับมาใหม่อีกครั้งในภายหลัง
                 </p>
+                <div class="w-12 h-px bg-zinc-900 mx-auto my-3"></div>
+                <p class="text-zinc-700 text-[9px] md:text-[10px] uppercase tracking-widest font-light text-center leading-relaxed">
+                    The system is undergoing maintenance. <br> Please return later.
+                </p>
             </div>
+            
             <footer class="mt-24">
-                <a href="#admin" class="text-[7px] text-zinc-900 uppercase tracking-widest hover:text-zinc-800 transition-colors">Staff Access</a>
+                <a href="#admin" class="text-[7px] text-zinc-900 uppercase tracking-widest hover:text-zinc-800 transition-colors">Staff Access / สำหรับเจ้าหน้าที่</a>
             </footer>
         </div>
     </div>
 
-    <!-- ADMIN LOGIN & DASHBOARD (KEEP ORIGINAL STRUCTURE) -->
+    <!-- ADMIN LOGIN -->
     <div id="admin-login-page" class="hidden fixed inset-0 flex items-center justify-center p-6 bg-black/98 z-[4000]">
         <div class="w-[90vw] max-w-sm bg-zinc-900/20 border border-zinc-900 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] text-center shadow-2xl backdrop-blur-xl">
+            <img src="https://img5.pic.in.th/file/secure-sv1/Asset-310x.png" alt="Logo" class="max-h-16 w-auto mx-auto mb-10 object-contain opacity-50 block">
             <h2 class="text-xs font-bold mb-8 tracking-[0.4em] uppercase text-red-900 border-t border-zinc-900 pt-8 text-center">Secure Vault</h2>
             <input type="password" id="admin-password-input" placeholder="ACCESS CODE" class="w-full rounded-2xl p-4 mb-4 outline-none text-center text-xl placeholder:text-[10px] placeholder:tracking-[0.8em] tracking-[0.5em] bg-black border border-zinc-900 text-white" onkeydown="if(event.key === 'Enter') window.checkAdminPassword()">
+            <p id="login-error" class="text-red-900 text-[9px] mb-4 hidden uppercase tracking-widest text-center">Access Denied</p>
             <button onclick="window.checkAdminPassword()" class="w-full bg-red-950/30 border border-red-900/50 text-red-800 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all hover:bg-red-900 hover:text-white">Authorize</button>
             <a href="#" class="inline-block mt-8 text-zinc-800 hover:text-zinc-600 text-[8px] uppercase tracking-widest transition-colors w-full text-center">← Exit</a>
         </div>
     </div>
 
+    <!-- ADMIN DASHBOARD -->
     <div id="admin-page" class="hidden w-full max-w-full overflow-x-hidden px-3 md:px-6 py-12 relative z-10 text-left box-border">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 md:mb-12 gap-4 border-b border-zinc-900 pb-8 w-full max-w-6xl mx-auto">
-            <div>
+            <div class="max-w-full overflow-hidden">
                 <h1 class="text-lg md:text-2xl font-bold text-red-900 tracking-tighter uppercase text-left truncate">Curator Studio</h1>
                 <p class="text-zinc-700 text-[8px] uppercase tracking-widest mt-1 text-left">Exhibition Design & Sequence</p>
             </div>
@@ -1342,66 +1381,225 @@
         </div>
         
         <div class="grid lg:grid-cols-5 gap-6 md:gap-10 text-left w-full max-w-6xl mx-auto">
+            <!-- ซ้าย: แบบฟอร์มเพิ่มข้อมูล -->
             <div class="lg:col-span-2 w-full min-w-0">
                 <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 lg:sticky lg:top-10 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
+                    <h2 class="text-[10px] md:text-xs font-bold mb-6 md:mb-8 flex items-center uppercase tracking-[0.2em] text-zinc-600">
+                        <span class="w-1 h-3 bg-red-900 mr-3 rounded-full text-left"></span> New exhibit
+                    </h2>
                     <form id="add-link-form" class="space-y-4 w-full">
                         <input type="text" id="title" required placeholder="DISPLAY TITLE" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
-                        <textarea id="description" placeholder="DESCRIPTION" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[100px] mt-0"></textarea>
-                        <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
-                        <select id="type" onchange="window.handleTypeChange('add')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
-                            <option value="link">🔗 Link Card</option>
-                            <option value="image">🖼️ Static Image</option>
-                            <option value="video">🎥 Motion Video</option>
-                            <option value="text">📝 Narrative Text</option>
-                        </select>
-                        <div id="add-ratio-wrapper" class="hidden w-full">
-                            <select id="add-ratio" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest border-red-900/20 bg-red-900/5">
-                                <option value="16/9">16:9</option>
-                                <option value="1/1">1:1</option>
-                            </select>
+                        
+                        <!-- Rich Text Toolbar -->
+                        <div class="bg-zinc-900/40 p-2 rounded-t-xl border border-zinc-800 border-b-0 flex gap-2">
+                            <button type="button" onclick="window.formatText('description', 'b')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวหนา"><i data-lucide="bold" class="w-3.5 h-3.5"></i></button>
+                            <button type="button" onclick="window.formatText('description', 'i')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวเอียง"><i data-lucide="italic" class="w-3.5 h-3.5"></i></button>
+                            <div class="w-px bg-zinc-800 mx-1"></div>
+                            <button type="button" onclick="window.formatText('description', 'br')" class="p-1.5 px-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white text-[8px] font-bold tracking-widest uppercase transition-colors" title="เว้นบรรทัด">BR</button>
                         </div>
-                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:bg-red-900 hover:text-white text-center mt-4">Add Item</button>
+                        <textarea id="description" placeholder="DESCRIPTION (OPTIONAL) - รองรับ HTML พื้นฐาน" class="w-full rounded-b-xl rounded-t-none p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px] border-t-0 mt-0"></textarea>
+                        
+                        <input type="url" id="url" placeholder="RESOURCE URL (IMG/YT)" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest mt-4">
+                        
+                        <div class="space-y-4 w-full">
+                            <select id="type" onchange="window.handleTypeChange('add')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                                <option value="link">🔗 Link Card</option>
+                                <option value="image">🖼️ Static Image</option>
+                                <option value="video">🎥 Motion Video</option>
+                                <option value="text">📝 Narrative Text</option>
+                            </select>
+                            
+                            <div id="add-ratio-wrapper" class="hidden w-full">
+                                <label class="text-[7px] md:text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
+                                <select id="add-ratio" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest border-red-900/20 bg-red-900/5">
+                                    <option value="16/9">📐 16:9 (Standard)</option>
+                                    <option value="1/1">📐 1:1 (Square)</option>
+                                    <option value="9/16">📐 9:16 (Vertical)</option>
+                                    <option value="4/3">📐 4:3 (Classic)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:bg-red-900 hover:text-white text-center mt-4">Add to Sequence</button>
                     </form>
                 </div>
             </div>
             
+            <!-- ขวา: รายการ Active Sequence -->
             <div class="lg:col-span-3 w-full min-w-0">
                 <div class="bg-zinc-900/5 p-4 md:p-8 rounded-3xl md:rounded-[3rem] border border-zinc-900 w-full box-border overflow-hidden">
+                    <h2 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.2em] text-zinc-700">Active Sequence</h2>
+                    <p class="text-[7px] md:text-[8px] text-zinc-800 mb-6 md:mb-8 uppercase tracking-widest font-light">Drag ☰ icons to reorder elements</p>
                     <div id="admin-links-container" class="space-y-2 w-full overflow-hidden"></div>
+                </div>
+            </div>
+
+            <!-- ล่างสุด: Analytics & Visitor Logs -->
+            <div class="lg:col-span-5 w-full min-w-0 mt-4 md:mt-8">
+                <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <h2 class="text-[10px] md:text-xs font-bold flex items-center uppercase tracking-[0.2em] text-zinc-600">
+                            <span class="w-1 h-3 bg-zinc-500 mr-3 rounded-full text-left"></span> Analytics & Logs
+                        </h2>
+                        <!-- กลุ่มปุ่มจัดการข้อมูล -->
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <button onclick="window.confirmClearAnalytics()" class="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-red-900/10 text-red-500 border border-red-900/30 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-red-900/40 hover:text-red-300 transition-all">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Data
+                            </button>
+                            <button onclick="window.exportCSV()" class="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-green-900/20 text-green-600 border border-green-900/50 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-green-800 hover:text-white transition-all">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div onclick="window.openAnalyticsSummary()" class="group bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/80 hover:border-zinc-700 transition-all relative overflow-hidden">
+                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 text-zinc-700 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2 group-hover:text-zinc-400 transition-colors">Total Views</p>
+                            <p id="admin-total-views" class="text-2xl md:text-3xl text-white font-light tracking-tighter">0</p>
+                        </div>
+                        <div onclick="window.openAnalyticsSummary()" class="group bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/80 hover:border-zinc-700 transition-all relative overflow-hidden">
+                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 text-zinc-700 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2 group-hover:text-zinc-400 transition-colors">Unique Viewers</p>
+                            <p id="admin-unique-views" class="text-2xl md:text-3xl text-zinc-300 font-light tracking-tighter">0</p>
+                        </div>
+                        <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 col-span-2 flex flex-col items-center justify-center text-center px-4">
+                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">System Status</p>
+                            <p class="text-[9px] text-green-700 uppercase tracking-widest font-bold">Tracking Active</p>
+                            <p class="text-[7px] text-zinc-600 mt-1 uppercase tracking-widest">Auto-updating metrics (Showing Top 50)</p>
+                        </div>
+                    </div>
+
+                    <div class="w-full border border-zinc-900 rounded-2xl overflow-hidden bg-black/20">
+                        <div class="max-h-64 overflow-y-auto custom-scrollbar">
+                            <table class="w-full text-left text-[9px] text-zinc-400 border-collapse">
+                                <thead class="sticky top-0 bg-[#070707] uppercase tracking-widest text-zinc-600 text-[8px] border-b border-zinc-800 z-10">
+                                    <tr>
+                                        <th class="py-3 px-4 font-normal">Timestamp</th>
+                                        <th class="py-3 px-4 font-normal">UID (Hash)</th>
+                                        <th class="py-3 px-4 font-normal">Device / Platform</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-visitor-logs" class="divide-y divide-zinc-900/50 relative z-0">
+                                    <!-- Logs -->
+                                    <tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- LIGHTBOX AND EDIT MODALS ARE SAME AS ORIGINAL -->
+    <!-- Modals -->
     <div id="edit-modal" class="hidden fixed inset-0 z-[1100] items-center justify-center bg-black/98 p-4 backdrop-blur-2xl">
         <div class="bg-zinc-900/20 border border-zinc-900 p-5 md:p-10 rounded-3xl md:rounded-[4rem] max-w-[95vw] md:max-w-lg w-full shadow-2xl">
-            <h3 class="text-xs font-bold mb-6 md:mb-10 uppercase tracking-[0.3em] text-white text-center">Edit Item</h3>
+            <h3 class="text-[10px] md:text-xs font-bold mb-6 md:mb-10 uppercase tracking-[0.3em] text-white text-center">Edit Item Details</h3>
             <form id="edit-form" class="space-y-4">
                 <input type="hidden" id="edit-id">
-                <input type="text" id="edit-title" required class="w-full rounded-xl p-3 md:p-4 outline-none text-[10px] uppercase tracking-widest">
-                <textarea id="edit-description" class="w-full rounded-xl p-3 md:p-4 outline-none text-[10px] uppercase tracking-widest min-h-[100px]"></textarea>
-                <input type="url" id="edit-url" class="w-full rounded-xl p-3 md:p-4 outline-none text-[10px] uppercase tracking-widest mt-4">
-                <select id="edit-type" onchange="window.handleTypeChange('edit')" class="w-full rounded-xl p-3 md:p-4 outline-none text-[10px] uppercase tracking-widest">
-                    <option value="link">Link</option>
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
-                    <option value="text">Text</option>
+                <input type="text" id="edit-title" required class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                
+                <!-- Rich Text Toolbar -->
+                <div class="bg-zinc-900/40 p-2 rounded-t-xl border border-zinc-800 border-b-0 flex gap-2">
+                    <button type="button" onclick="window.formatText('edit-description', 'b')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวหนา"><i data-lucide="bold" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" onclick="window.formatText('edit-description', 'i')" class="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors" title="ตัวเอียง"><i data-lucide="italic" class="w-3.5 h-3.5"></i></button>
+                    <div class="w-px bg-zinc-800 mx-1"></div>
+                    <button type="button" onclick="window.formatText('edit-description', 'br')" class="p-1.5 px-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white text-[8px] font-bold tracking-widest uppercase transition-colors" title="เว้นบรรทัด">BR</button>
+                </div>
+                <textarea id="edit-description" placeholder="Description" class="w-full rounded-b-xl rounded-t-none p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest min-h-[80px] md:min-h-[100px] border-t-0 mt-0"></textarea>
+                
+                <input type="url" id="edit-url" class="w-full rounded-xl p-3 md:p-4 outline-none text-[9px] md:text-[10px] uppercase tracking-widest mt-4">
+                
+                <div class="space-y-4 w-full">
+                    <select id="edit-type" onchange="window.handleTypeChange('edit')" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest">
+                        <option value="link">Link Card</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="text">Narrative Text</option>
+                    </select>
+                    
+                    <div id="edit-ratio-wrapper" class="hidden w-full">
+                        <label class="text-[7px] md:text-[8px] text-zinc-600 mb-1 ml-1 block uppercase tracking-widest">Aspect Ratio</label>
+                        <select id="edit-ratio" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest border-red-900/20">
+                            <option value="16/9">16:9 (Standard)</option>
+                            <option value="1/1">1:1 (Square)</option>
+                            <option value="9/16">9:16 (Vertical)</option>
+                            <option value="4/3">4:3 (Classic)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <select id="edit-status" class="w-full rounded-xl p-3 md:p-4 outline-none appearance-none text-[9px] md:text-[10px] uppercase tracking-widest mt-2 border-zinc-900">
+                    <option value="show">🟢 PUBLIC</option>
+                    <option value="hide">🔴 PRIVATE</option>
                 </select>
                 <div class="grid grid-cols-2 gap-3 md:gap-4 mt-8">
-                    <button type="submit" class="bg-blue-950/20 border border-blue-900 text-blue-700 py-3 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-blue-900 hover:text-white transition-all">Save</button>
-                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-900 text-zinc-600 py-3 rounded-2xl font-bold uppercase tracking-widest text-[9px] hover:bg-zinc-800 transition-all">Back</button>
+                    <button type="submit" class="bg-blue-950/20 border border-blue-900 text-blue-700 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-blue-900 hover:text-white transition-all">Save</button>
+                    <button type="button" onclick="window.closeEditModal()" class="bg-zinc-900 text-zinc-600 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-zinc-800 transition-all">Back</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Modal ยืนยันการลบ Item -->
     <div id="custom-confirm" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4">
-        <div class="bg-zinc-900/50 border border-zinc-900 p-8 rounded-3xl max-w-sm w-full text-center backdrop-blur-xl">
-            <h3 class="text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900">Delete Item?</h3>
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-3 rounded-2xl font-bold uppercase text-[9px] hover:bg-red-900 hover:text-white">Delete</button>
-                <button onclick="window.closeCustomConfirm()" class="bg-zinc-900 text-zinc-600 py-3 rounded-2xl font-bold uppercase text-[9px] hover:bg-zinc-800">Cancel</button>
+        <div class="bg-zinc-900/50 border border-zinc-900 p-8 md:p-12 rounded-3xl md:rounded-[4rem] max-w-[90vw] md:max-w-sm w-full text-center backdrop-blur-xl">
+            <h3 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-900">Unregister Item?</h3>
+            <p class="text-zinc-600 text-[8px] md:text-[9px] mb-8 md:mb-12 uppercase font-light tracking-[0.2em]">Permanent removal from sequence</p>
+            <div class="grid grid-cols-2 gap-3 md:gap-4">
+                <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-red-900 hover:text-white transition-all">Delete</button>
+                <button onclick="window.closeCustomConfirm()" class="bg-zinc-900 text-zinc-600 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ยืนยันการล้างข้อมูล Analytics -->
+    <div id="clear-analytics-confirm" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+        <div class="bg-zinc-900/80 border border-red-900/50 p-8 md:p-12 rounded-3xl md:rounded-[4rem] max-w-[90vw] md:max-w-sm w-full text-center shadow-2xl">
+            <div class="w-12 h-12 bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-900/50">
+                <i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i>
+            </div>
+            <h3 class="text-[10px] md:text-xs font-bold mb-4 uppercase tracking-[0.3em] text-red-500">Clear All Data?</h3>
+            <p class="text-zinc-400 text-[8px] md:text-[10px] mb-8 md:mb-12 font-light leading-relaxed">ข้อมูลยอดเข้าชม (Views) และประวัติการเข้าใช้งานทั้งหมดจะถูกลบ <br> <b class="text-red-400 font-normal">การกระทำนี้ไม่สามารถเรียกคืนได้</b></p>
+            <div class="grid grid-cols-2 gap-3 md:gap-4">
+                <button onclick="window.executeClearAnalytics()" class="bg-red-600 hover:bg-red-500 text-white py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)]">Confirm</button>
+                <button onclick="window.closeClearAnalytics()" class="bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ดูสรุปข้อมูลแบบละเอียด (Detailed Summary) -->
+    <div id="analytics-summary-modal" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+        <div class="bg-[#0a0a0a] border border-zinc-800 p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col relative">
+            <button onclick="window.closeAnalyticsSummary()" class="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            
+            <h3 class="text-[10px] md:text-xs font-bold mb-2 uppercase tracking-[0.2em] text-white flex items-center gap-2">
+                <i data-lucide="bar-chart-2" class="w-4 h-4 text-zinc-400"></i>
+                Detailed Audience Summary
+            </h3>
+            <p class="text-zinc-500 text-[8px] md:text-[9px] mb-6 uppercase tracking-widest">สรุปจำนวนครั้งที่เข้าชมแยกตามแต่ละเครื่อง</p>
+            
+            <div class="w-full border border-zinc-800 rounded-xl overflow-hidden bg-black/40 flex-1 overflow-y-auto custom-scrollbar">
+                <table class="w-full text-left text-[9px] md:text-[10px] text-zinc-400 border-collapse">
+                    <thead class="sticky top-0 bg-[#0f0f0f] uppercase tracking-widest text-zinc-500 text-[8px] border-b border-zinc-800 z-10 shadow-sm">
+                        <tr>
+                            <th class="py-3 px-4 font-normal text-center w-20">Visits</th>
+                            <th class="py-3 px-4 font-normal">UID (Identifier)</th>
+                            <th class="py-3 px-4 font-normal">Device</th>
+                            <th class="py-3 px-4 font-normal">Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analytics-summary-tbody" class="divide-y divide-zinc-900/50">
+                        <!-- Content injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-6 flex justify-end">
+                <button onclick="window.closeAnalyticsSummary()" class="bg-zinc-800 text-white px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-zinc-700 transition-all">Close</button>
             </div>
         </div>
     </div>
