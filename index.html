@@ -271,10 +271,19 @@
             
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
+            const successToast = document.getElementById('sound-success-toast');
 
             soundPrompt.classList.add('opacity-0', 'translate-y-10');
             setTimeout(() => {
                 soundControls.classList.add('hidden');
+                
+                // แสดงป็อปอัพแจ้งเตือนว่าเปิดเสียงสำเร็จแล้ว
+                successToast.classList.remove('opacity-0', 'translate-y-10');
+                
+                // ซ่อนป็อปอัพแจ้งเตือนหลังจาก 3 วินาที
+                setTimeout(() => {
+                    successToast.classList.add('opacity-0', 'translate-y-10');
+                }, 3000);
             }, 500);
 
             renderViewerLinks(); // Re-render iframes to unmute
@@ -720,12 +729,20 @@
 
     <!-- SMART SOUND PROMPT (Minimalist) -->
     <div id="global-sound-controls" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[2000] pointer-events-none">
-        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-10 glass-panel px-5 py-2.5 rounded-full shadow-2xl flex items-center justify-between gap-4 border border-zinc-700/50 min-w-[180px]">
-            <div class="flex items-center gap-2">
-                <i data-lucide="volume-2" class="w-3.5 h-3.5 text-zinc-400"></i>
-                <p class="text-[9px] uppercase tracking-widest text-zinc-300 m-0">Sound</p>
+        <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-10 glass-panel px-5 py-3 rounded-full shadow-2xl flex items-center justify-between gap-4 border border-zinc-700/50 min-w-[240px]">
+            <div class="flex items-center gap-2.5">
+                <i data-lucide="volume-x" class="w-4 h-4 text-red-400"></i>
+                <p class="text-[11px] text-zinc-200 m-0 font-light">วิดีโอถูกปิดเสียง</p>
             </div>
-            <button onclick="window.enableSound()" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600/50 text-white text-[8px] py-1.5 px-4 rounded-full transition-all uppercase tracking-wider shadow-lg">Enable</button>
+            <button onclick="window.enableSound()" class="bg-red-600 hover:bg-red-500 text-white text-[10px] py-1.5 px-4 rounded-full transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] font-medium whitespace-nowrap tracking-wide">แตะเพื่อเปิดเสียง</button>
+        </div>
+    </div>
+
+    <!-- SOUND SUCCESS TOAST -->
+    <div id="sound-success-toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[2001] pointer-events-none opacity-0 translate-y-10 transition-all duration-500">
+        <div class="glass-panel px-5 py-2.5 rounded-full shadow-2xl flex items-center justify-center gap-3 border border-green-900/50 bg-black/60">
+            <i data-lucide="volume-2" class="w-4 h-4 text-green-500"></i>
+            <p class="text-[10px] text-green-50 m-0 font-medium tracking-wide whitespace-nowrap">เปิดเสียงวิดีโอเรียบร้อยแล้ว</p>
         </div>
     </div>
 
