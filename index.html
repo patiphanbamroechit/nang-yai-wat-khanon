@@ -320,7 +320,7 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
             
-            // ปรากฏเมื่อมีวิดีโอประเภท Autoplay-Muted ที่กำลังเล่นอยู่บนจอเท่านั้น
+            // ปรากฏเมื่อมีวิดีโอประเภท Autoplay-Muted ที่กำลังแสดงอยู่บนจอเท่านั้น
             if (visibleVideos.size > 0 && isGlobalMuted) {
                 soundControls.classList.remove('hidden');
                 setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
@@ -343,21 +343,20 @@
                 window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
             }, 500);
 
-            // เปลี่ยนลิงก์ iframe เพื่อเปิดเสียงและเริ่มเล่นที่วินาทีที่ 0
-            const iframes = document.querySelectorAll('.video-iframe');
+            // บังคับให้วิดีโอที่มีคลาส autoplay-video เริ่มเล่นใหม่ที่วินาทีที่ 0 พร้อมเปิดเสียง
+            const iframes = document.querySelectorAll('.autoplay-video');
             let firstIframe = null;
             
             iframes.forEach(iframe => {
-                if (iframe.src && iframe.src.includes('mute=1')) {
-                    // เปลี่ยน mute=1 เป็น mute=0 และเพิ่ม start=0 เพื่อบังคับเริ่มใหม่
-                    let newSrc = iframe.src.replace('mute=1', 'mute=0');
-                    if (!newSrc.includes('start=')) {
-                        newSrc += '&start=0';
-                    } else {
-                        newSrc = newSrc.replace(/start=\d+/, 'start=0');
-                    }
-                    iframe.src = newSrc;
-                    if (!firstIframe) firstIframe = iframe;
+                if (iframe.src) {
+                    try {
+                        let url = new URL(iframe.src);
+                        url.searchParams.set('mute', '0');
+                        url.searchParams.set('autoplay', '1');
+                        url.searchParams.set('start', '0');
+                        iframe.src = url.toString();
+                        if (!firstIframe) firstIframe = iframe;
+                    } catch (e) { console.error("URL Error", e); }
                 }
             });
 
@@ -558,14 +557,14 @@
                         </div>
                     `;
                 } else if (link.type === 'video') {
-                    // กำหนดให้วิดีโอทั้งหมดเป็น Autoplay แต่ระบบจะแสดงป๊อปอัพเฉพาะเมื่อวิดีโอประเภทนี้อยู่ในจอ
-                    // หากผู้ใช้ต้องการ Manual Play อย่างแท้จริง สามารถตั้งเงื่อนไขแยกได้ที่นี่
-                    const isAutoplay = true; 
+                    // ดึงค่า Autoplay จาก Database (ถ้าไม่มีให้เป็น true เป็นค่าเริ่มต้น)
+                    const isAutoplay = link.autoplay !== false; 
                     const embedUrl = getEmbedUrl(link.url, isAutoplay);
                     const ratio = link.ratio || '16/9';
                     
                     // ป๊อปอัพจะทำงานเฉพาะคลาส 'autoplay-video'
-                    const videoClass = isAutoplay ? 'video-iframe autoplay-video' : 'video-iframe';
+                    // ถ้าตั้งเป็น Manual Play จะไม่มีคลาสนี้ ทำให้ระบบตรวจจับ (Observer) ไม่ทำงานสำหรับวิดีโอนี้
+                    const videoClass = isAutoplay ? 'video-iframe autoplay-video' : 'video-iframe manual-video';
                     
                     return `
                         <div class=\"reveal-item w-full mb-14 text-left\" style=\"animation-delay: ${delay}s\">
@@ -704,10 +703,13 @@
         window.handleTypeChange = (mode) => {
             const typeSelect = document.getElementById(mode === 'add' ? 'type' : 'edit-type');
             const ratioWrapper = document.getElementById(mode === 'add' ? 'add-ratio-wrapper' : 'edit-ratio-wrapper');
+            const autoplayWrapper = document.getElementById(mode === 'add' ? 'add-autoplay-wrapper' : 'edit-autoplay-wrapper');
             if (typeSelect.value === 'video') {
                 ratioWrapper.classList.remove('hidden');
+                autoplayWrapper.classList.remove('hidden');
             } else {
                 ratioWrapper.classList.add('hidden');
+                autoplayWrapper.classList.add('hidden');
             }
         };
 
@@ -866,6 +868,7 @@
             document.getElementById('edit-description').value = link.description || '';
             document.getElementById('edit-status').value = link.status || 'show';
             document.getElementById('edit-ratio').value = link.ratio || '16/9';
+            document.getElementById('edit-autoplay').checked = link.autoplay !== false;
             
             window.handleTypeChange('edit');
             
@@ -893,9 +896,10 @@
             const description = document.getElementById('edit-description').value;
             const status = document.getElementById('edit-status').value;
             const ratio = document.getElementById('edit-ratio').value;
+            const autoplay = document.getElementById('edit-autoplay').checked;
             try {
                 await updateDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', id), {
-                    title, url, type, description, status, ratio
+                    title, url, type, description, status, ratio, autoplay
                 });
                 window.closeEditModal();
                 window.showToast('บันทึกการแก้ไขเรียบร้อย', 'success');
@@ -912,10 +916,11 @@
             const type = document.getElementById('type').value;
             const description = document.getElementById('description').value;
             const ratio = document.getElementById('add-ratio').value;
+            const autoplay = document.getElementById('add-autoplay').checked;
             const createdAt = Date.now();
             try {
                 await addDoc(collection(db, 'artifacts', app_id_path, 'public', 'data', 'links'), {
-                    title, url, type, description, ratio, createdAt, order: createdAt, status: 'show'
+                    title, url, type, description, ratio, createdAt, order: createdAt, status: 'show', autoplay
                 });
                 addLinkForm.reset();
                 window.handleTypeChange('add');
@@ -1243,6 +1248,11 @@
                                     <option value="4/3">📐 4:3 (Classic)</option>
                                 </select>
                             </div>
+
+                            <div id="add-autoplay-wrapper" class="hidden w-full flex items-center gap-2 p-2 bg-zinc-900/30 rounded-xl border border-zinc-800">
+                                <input type="checkbox" id="add-autoplay" checked class="w-4 h-4 rounded border-zinc-800 bg-black text-red-600 focus:ring-red-600">
+                                <label for="add-autoplay" class="text-[9px] md:text-[10px] text-zinc-400 uppercase tracking-widest cursor-pointer">เล่นอัตโนมัติ (Autoplay)</label>
+                            </div>
                         </div>
                         
                         <button type="submit" class="w-full bg-red-950/20 border border-red-900/50 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:bg-red-900 hover:text-white text-center mt-4">Add to Sequence</button>
@@ -1352,6 +1362,11 @@
                             <option value="9/16">9:16 (Vertical)</option>
                             <option value="4/3">4:3 (Classic)</option>
                         </select>
+                    </div>
+
+                    <div id="edit-autoplay-wrapper" class="hidden w-full flex items-center gap-2 p-2 bg-zinc-900/30 rounded-xl border border-zinc-800">
+                        <input type="checkbox" id="edit-autoplay" class="w-4 h-4 rounded border-zinc-800 bg-black text-red-600 focus:ring-red-600">
+                        <label for="edit-autoplay" class="text-[9px] md:text-[10px] text-zinc-400 uppercase tracking-widest cursor-pointer">เล่นอัตโนมัติ (Autoplay)</label>
                     </div>
                 </div>
 
