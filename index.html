@@ -347,7 +347,16 @@
                         document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
                         
                         Object.values(window.ytPlayers).forEach(player => {
-                            try { if (typeof player.unMute === 'function') player.unMute(); } catch(e) {}
+                            try { 
+                                if (typeof player.unMute === 'function') {
+                                    player.unMute(); 
+                                    const state = player.getPlayerState();
+                                    if (state === 1 || state === 2 || state === 3 || state === -1 || player.getCurrentTime() > 0) {
+                                        player.seekTo(0);
+                                        player.playVideo();
+                                    }
+                                }
+                            } catch(e) {}
                         });
                     }
                 }
@@ -481,8 +490,17 @@
             Object.keys(window.ytPlayers).forEach(id => {
                 const player = window.ytPlayers[id];
                 try {
-                    if (typeof player.unMute === 'function') player.unMute();
+                    if (typeof player.unMute === 'function') {
+                        player.unMute();
+                        // สั่งให้กลับไปเริ่มใหม่เมื่อกดจาก Overlay
+                        const state = player.getPlayerState();
+                        if (state === 1 || state === 2 || state === 3 || state === -1 || player.getCurrentTime() > 0) {
+                            player.seekTo(0);
+                            player.playVideo();
+                        }
+                    }
                     if (id === ytId && typeof player.playVideo === 'function') {
+                        player.seekTo(0);
                         player.playVideo(); 
                     }
                 } catch(e) {}
@@ -497,12 +515,14 @@
                 return;
             }
 
-            let isAnyMutedAndPlaying = false;
+            let isAnyActiveAndMuted = false;
             Object.values(window.ytPlayers).forEach(player => {
                 try {
                     if (typeof player.getPlayerState === 'function') {
-                        if (player.getPlayerState() === 1 && player.isMuted()) {
-                            isAnyMutedAndPlaying = true;
+                        const state = player.getPlayerState();
+                        // 1 = กำลังเล่น, 3 = กำลังโหลด, -1 = Unstarted (อาจโดนเบราว์เซอร์บล็อกการเล่นอัตโนมัติ)
+                        if ((state === 1 || state === 3 || state === -1) && player.isMuted()) {
+                            isAnyActiveAndMuted = true;
                         }
                     }
                 } catch(e){}
@@ -511,7 +531,8 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            if (isAnyMutedAndPlaying) {
+            // ถ้ามีวิดีโอใดๆ ที่ active และระบบถูก mute อยู่ จะทำการแสดงป๊อปอัพ
+            if (isAnyActiveAndMuted && isGlobalMuted) {
                 // เคลียร์ Timeout เก่าเพื่อป้องกันปัญหาการซ่อนที่ตกค้างและทับซ้อน
                 if (window.hidePromptTimeout) {
                     clearTimeout(window.hidePromptTimeout);
@@ -568,6 +589,14 @@
                 try {
                     if (typeof player.unMute === 'function') {
                         player.unMute();
+                        
+                        // สั่งให้กลับไปเริ่มใหม่เมื่อกดเปิดเสียง
+                        const state = player.getPlayerState();
+                        if (state === 1 || state === 2 || state === 3 || state === -1 || player.getCurrentTime() > 0) {
+                            player.seekTo(0);
+                            player.playVideo();
+                        }
+                        
                         if (player.getPlayerState() === 1 && !firstPlayingIframe) {
                             firstPlayingIframe = player.getIframe();
                         }
@@ -1280,7 +1309,7 @@
     </div>
 
     <!-- SMART SOUND PROMPT (Responsive Minimalist) -->
-    <div id="global-sound-controls" class="hidden fixed bottom-6 w-full px-4 left-0 z-[2000] pointer-events-none flex justify-center">
+    <div id="global-sound-controls" class="hidden fixed bottom-6 w-full px-4 left-0 z-[9990] pointer-events-none flex justify-center">
         <div id="sound-prompt" class="pointer-events-auto opacity-0 translate-y-10 glass-panel px-4 py-2.5 md:px-5 md:py-3 rounded-full shadow-2xl flex items-center justify-between gap-3 md:gap-4 border border-zinc-700/50 w-max max-w-full">
             <div class="flex items-center gap-2 md:gap-2.5 shrink-0">
                 <i data-lucide="volume-x" class="w-3.5 h-3.5 md:w-4 md:h-4 text-red-400"></i>
