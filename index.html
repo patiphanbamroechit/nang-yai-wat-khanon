@@ -312,29 +312,6 @@
             }, 2500); 
         });
 
-        // --- ดักจับการกดที่วิดีโอ YouTube โดยตรง (Smart Tap Detection) ---
-        // ถ้าผู้ใช้กดวิดีโอเอง (บนมือถือหรือคอม) หน้าต่างจะสูญเสีย Focus เราจะทำการเปิดเสียงให้ทันที!
-        window.addEventListener('blur', () => {
-            setTimeout(() => {
-                const active = document.activeElement;
-                if (active && active.tagName === 'IFRAME' && active.classList.contains('yt-video-frame')) {
-                    if (isGlobalMuted) {
-                        isGlobalMuted = false;
-                        window.soundPromptDismissed = true;
-                        hidePrompt();
-                        
-                        Object.values(window.ytPlayers).forEach(player => {
-                            try {
-                                if (typeof player.unMute === 'function') {
-                                    player.unMute();
-                                }
-                            } catch(e) {}
-                        });
-                    }
-                }
-            }, 100);
-        });
-
         let bttTimeout;
         window.addEventListener('scroll', () => {
             const btt = document.getElementById('back-to-top');
@@ -379,7 +356,7 @@
             }
         };
 
-        // --- แก้ไขระบบ YouTube API ---
+        // --- YouTube API Management ---
         window.initYTPlayers = () => {
             if (!window.ytApiReady || typeof YT === 'undefined' || !YT.Player) return;
 
@@ -392,20 +369,23 @@
                         window.ytPlayers[iframe.id] = new YT.Player(iframe.id, {
                             events: {
                                 'onReady': (event) => {
-                                    // ถ้าเปิดเว็บมาครั้งแรก ให้แน่ใจว่า Mute ไว้เพื่อบังคับ Autoplay ทะลุกฎเบราว์เซอร์
+                                    // การันตีการปิดเสียงเพื่อให้ออโต้เพลย์ทำงานผ่านกฎเบราว์เซอร์ได้
                                     if (isGlobalMuted) {
                                         event.target.mute(); 
-                                    } else {
-                                        event.target.unMute();
                                     }
-                                    event.target.playVideo(); // บังคับให้เล่น
-                                    window.updateSoundPromptVisibility();
+                                    // บังคับเล่น
+                                    setTimeout(() => {
+                                        event.target.playVideo();
+                                        window.updateSoundPromptVisibility();
+                                    }, 300);
                                 },
                                 'onStateChange': (event) => {
-                                    // หากเราตรวจพบว่าวิดีโอเล่นอยู่แล้วไม่ได้โดนปิดเสียง (กดเปิดเสียงที่ปุ่มใน YouTube)
+                                    // 1 = PLAYING. ตรวจสอบว่าวิดีโอเล่นอยู่และมีเสียงไหม
                                     if (isGlobalMuted && event.data === 1 && !event.target.isMuted()) {
                                         isGlobalMuted = false;
                                         window.soundPromptDismissed = true;
+                                        hidePrompt();
+                                        document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
                                     }
                                     window.updateSoundPromptVisibility();
                                 }
@@ -418,6 +398,31 @@
             });
         };
 
+        // ระบบจับการ "แตะวิดีโอ" ของผู้ใช้โดยตรง (เมื่อแตะแผ่นใส)
+        window.handleVideoTap = (ytId) => {
+            isGlobalMuted = false;
+            window.soundPromptDismissed = true;
+            hidePrompt(); // ซ่อนป็อปอัพแจ้งเตือน
+            
+            // ซ่อนแผ่นใสทั้งหมด เพื่อให้ผู้ใช้กดหยุด/ข้ามวิดีโอได้ตามปกติ
+            document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
+
+            // เปิดเสียงทุกวิดีโอ และบังคับเล่นวิดีโอตัวที่กด
+            Object.keys(window.ytPlayers).forEach(id => {
+                const player = window.ytPlayers[id];
+                try {
+                    if (typeof player.unMute === 'function') {
+                        player.unMute();
+                    }
+                    if (id === ytId && typeof player.playVideo === 'function') {
+                        player.playVideo(); // เล่นวิดีโอที่แตะทันที
+                    }
+                } catch(e) {}
+            });
+            
+            window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
+        };
+
         window.updateSoundPromptVisibility = () => {
             if (window.soundPromptDismissed) {
                 hidePrompt();
@@ -427,8 +432,8 @@
             let isAnyMutedAndPlaying = false;
             Object.values(window.ytPlayers).forEach(player => {
                 try {
-                    // ตรวจสอบว่ามีวิดีโอตัวไหน "กำลังเล่น" (State 1) และ "ถูกปิดเสียงอยู่"
                     if (typeof player.getPlayerState === 'function') {
+                        // เช็คว่ามีวิดีโอ "กำลังเล่น (1)" และ "ถูกปิดเสียงอยู่"
                         if (player.getPlayerState() === 1 && player.isMuted()) {
                             isAnyMutedAndPlaying = true;
                         }
@@ -439,7 +444,6 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            // จะแสดงป็อปอัพ "แตะเพื่อเปิดเสียง" ก็ต่อเมื่อวิดีโอกำลังเล่นอัตโนมัติอยู่จริงๆ
             if (isAnyMutedAndPlaying) {
                 soundControls.classList.remove('hidden');
                 setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
@@ -461,11 +465,14 @@
             }
         }, 1000);
 
+        // เมื่อผู้ใช้กดปุ่มเปิดเสียงด้านล่าง
         window.enableSound = () => {
             isGlobalMuted = false;
             window.soundPromptDismissed = true;
             
             hidePrompt();
+            // ซ่อนแผ่นใสดักจับการแตะทั้งหมดทิ้งไป
+            document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
             
             let firstPlayingIframe = null;
 
@@ -479,6 +486,8 @@
                     }
                 } catch(e) {}
             });
+
+            window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
 
             if (firstPlayingIframe) {
                 const container = firstPlayingIframe.closest('.reveal-item') || firstPlayingIframe;
@@ -548,9 +557,8 @@
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             if (match && match[2].length === 11) {
-                // บังคับ mute=1 เสมอในการโหลดครั้งแรกเพื่อให้เบราว์เซอร์ยอมเล่นอัตโนมัติ (Autoplay)
-                const originUrl = encodeURIComponent(window.location.origin);
-                return `https://www.youtube.com/embed/${match[2]}?enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&origin=${originUrl}&vq=hd1080`;
+                // ลบ Origin ออกเพื่อป้องกันปัญหาจอดำ (CORS Policy) และใส่รหัสบังคับออโต้เพลย์+ปิดเสียง
+                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&vq=hd1080`;
             }
             return null;
         };
@@ -561,7 +569,7 @@
             lb.classList.remove('hidden');
             lb.classList.add('flex');
             setTimeout(() => lb.classList.remove('opacity-0'), 10);
-            window.lockScroll(); // ล็อกหน้าจอทันทีเมื่อเปิดรูป
+            window.lockScroll();
         };
 
         window.closeLightbox = () => {
@@ -571,7 +579,7 @@
                 lb.classList.add('hidden');
                 lb.classList.remove('flex');
                 document.getElementById('lightbox-img').src = '';
-                window.unlockScroll(); // คืนค่าการเลื่อนเมื่อปิดรูป
+                window.unlockScroll(); 
             }, 300);
         };
 
@@ -649,6 +657,7 @@
                 } else if (link.type === 'video') {
                     const embedUrl = getEmbedUrl(link.url);
                     const ratio = link.ratio || '16/9';
+                    const ytId = `yt-player-${link.id}`; // ใช้ ID ที่แน่นอนเพื่อเชื่อมกับ Overlay
                     return `
                         <div class=\"reveal-item w-full mb-14 text-left\" style=\"animation-delay: ${delay}s\">
                             <div class=\"flex items-center justify-between mb-2\">
@@ -657,7 +666,11 @@
                             </div>
                             <div class=\"relative rounded-3xl overflow-hidden border border-zinc-800 bg-black mt-2 shadow-2xl\" style=\"aspect-ratio: ${ratio}\">
                                 ${embedUrl ? 
-                                    `<iframe id=\"yt-${link.id}\" class=\"w-full h-full yt-video-frame\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen></iframe>` : 
+                                    `
+                                    <iframe id="${ytId}" class=\"w-full h-full yt-video-frame relative z-10\" src=\"${embedUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen></iframe>
+                                    <!-- Magic Overlay: แผ่นใสดักจับการกดที่วิดีโอโดยตรง -->
+                                    <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay" onclick="window.handleVideoTap('${ytId}')"></div>
+                                    ` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
                                         <a href=\"${link.url}\" target=\"_blank\" class=\"text-[10px] hover:text-red-500 transition-colors underline opacity-50 text-center block w-full\">Watch on YouTube</a>
