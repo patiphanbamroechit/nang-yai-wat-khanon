@@ -746,18 +746,37 @@
             const modal = document.getElementById('analytics-summary-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+            
+            // ล็อกหน้าเว็บด้านหลัง
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.closeAnalyticsSummary = () => {
             const modal = document.getElementById('analytics-summary-modal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            
+            // ปลดล็อกหน้าเว็บ
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         // --- เพิ่มระบบล้างข้อมูล Analytics ---
         window.confirmClearAnalytics = () => {
             document.getElementById('clear-analytics-confirm').classList.remove('hidden');
             document.getElementById('clear-analytics-confirm').classList.add('flex');
+            
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+        };
+        
+        window.closeClearAnalytics = () => {
+            document.getElementById('clear-analytics-confirm').classList.add('hidden');
+            document.getElementById('clear-analytics-confirm').classList.remove('flex');
+            
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         window.executeClearAnalytics = async () => {
@@ -779,8 +798,7 @@
                 await batch.commit();
 
                 // ปิด Modal และแจ้งเตือน
-                document.getElementById('clear-analytics-confirm').classList.add('hidden');
-                document.getElementById('clear-analytics-confirm').classList.remove('flex');
+                window.closeClearAnalytics();
                 
                 // เคลียร์ข้อมูลในหน่วยความจำ
                 window.currentLogsData = [];
@@ -808,11 +826,17 @@
             
             editModal.classList.remove('hidden');
             editModal.classList.add('flex');
+            
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.closeEditModal = () => {
             editModal.classList.add('hidden');
             editModal.classList.remove('flex');
+            
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
         };
 
         document.getElementById('edit-form').onsubmit = async (e) => {
@@ -857,16 +881,28 @@
             }
         };
 
+        window.closeCustomConfirm = () => {
+            document.getElementById('custom-confirm').classList.add('hidden');
+            document.getElementById('custom-confirm').classList.remove('flex');
+            
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        };
+
         window.deleteLink = async (id) => {
             window.currentDeleteId = id;
             document.getElementById('custom-confirm').classList.remove('hidden');
+            document.getElementById('custom-confirm').classList.add('flex');
+            
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         };
 
         window.confirmDeleteAction = async () => {
             if (!currentUser) return;
             try {
                 await deleteDoc(doc(db, 'artifacts', app_id_path, 'public', 'data', 'links', window.currentDeleteId));
-                document.getElementById('custom-confirm').classList.add('hidden');
+                window.closeCustomConfirm();
                 window.showToast('ลบรายการเรียบร้อยแล้ว', 'success');
             } catch (e) {
                 console.error(e);
@@ -1293,7 +1329,7 @@
             <p class="text-zinc-600 text-[8px] md:text-[9px] mb-8 md:mb-12 uppercase font-light tracking-[0.2em]">Permanent removal from sequence</p>
             <div class="grid grid-cols-2 gap-3 md:gap-4">
                 <button onclick="window.confirmDeleteAction()" class="bg-red-950/40 border border-red-900 text-red-800 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-red-900 hover:text-white transition-all">Delete</button>
-                <button onclick="document.getElementById('custom-confirm').classList.add('hidden')" class="bg-zinc-900 text-zinc-600 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
+                <button onclick="window.closeCustomConfirm()" class="bg-zinc-900 text-zinc-600 py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all hover:bg-zinc-800">Cancel</button>
             </div>
         </div>
     </div>
@@ -1308,7 +1344,7 @@
             <p class="text-zinc-400 text-[8px] md:text-[10px] mb-8 md:mb-12 font-light leading-relaxed">ข้อมูลยอดเข้าชม (Views) และประวัติการเข้าใช้งานทั้งหมดจะถูกลบ <br> <b class="text-red-400 font-normal">การกระทำนี้ไม่สามารถเรียกคืนได้</b></p>
             <div class="grid grid-cols-2 gap-3 md:gap-4">
                 <button onclick="window.executeClearAnalytics()" class="bg-red-600 hover:bg-red-500 text-white py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)]">Confirm</button>
-                <button onclick="document.getElementById('clear-analytics-confirm').classList.add('hidden'); document.getElementById('clear-analytics-confirm').classList.remove('flex');" class="bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all">Cancel</button>
+                <button onclick="window.closeClearAnalytics()" class="bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white py-3 md:py-4 rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] transition-all">Cancel</button>
             </div>
         </div>
     </div>
