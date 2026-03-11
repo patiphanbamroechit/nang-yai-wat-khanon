@@ -407,7 +407,8 @@
             if (match && match[2].length === 11) {
                 const muteParam = isGlobalMuted ? 1 : 0;
                 const origin = window.location.origin;
-                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}`;
+                // เพิ่ม &vq=hd1080 เพื่อพยายามดันความละเอียดเป็น 1080p เป็นค่าเริ่มต้น
+                return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
             }
             return null;
         };
