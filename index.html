@@ -365,6 +365,11 @@
 
         let bttTimeout;
         window.addEventListener('scroll', () => {
+            // ระบบตรวจจับอัปเดตป๊อปอัพทันทีที่เกิดการเลื่อนหน้าจอ
+            if (!window.soundPromptDismissed && document.querySelectorAll('.yt-video-wrapper').length > 0) {
+                window.updateSoundPromptVisibility();
+            }
+
             const btt = document.getElementById('back-to-top');
             if(window.scrollY > 400) {
                 btt.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4', 'opacity-40');
@@ -509,31 +514,28 @@
             window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
         };
 
+        // --- ระบบอัปเดตป๊อปอัพเสียงแบบใหม่ (เน้นพิกัดหน้าจอแทนสถานะที่คลาดเคลื่อนง่าย) ---
         window.updateSoundPromptVisibility = () => {
             if (window.soundPromptDismissed) {
                 hidePrompt();
                 return;
             }
 
-            let isAnyActiveAndMuted = false;
-            Object.values(window.ytPlayers).forEach(player => {
-                try {
-                    if (typeof player.getPlayerState === 'function') {
-                        const state = player.getPlayerState();
-                        // 1 = กำลังเล่น, 3 = กำลังโหลด, -1 = Unstarted (อาจโดนเบราว์เซอร์บล็อกการเล่นอัตโนมัติ)
-                        if ((state === 1 || state === 3 || state === -1) && player.isMuted()) {
-                            isAnyActiveAndMuted = true;
-                        }
-                    }
-                } catch(e){}
+            let isAnyVisible = false;
+            const wrappers = document.querySelectorAll('.yt-video-wrapper');
+            wrappers.forEach(wrapper => {
+                const rect = wrapper.getBoundingClientRect();
+                // เช็คว่ามีกรอบวิดีโอโผล่เข้ามาในขอบเขตหน้าจอมือถือหรือไม่
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    isAnyVisible = true;
+                }
             });
 
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            // ถ้ามีวิดีโอใดๆ ที่ active และระบบถูก mute อยู่ จะทำการแสดงป๊อปอัพ
-            if (isAnyActiveAndMuted && isGlobalMuted) {
-                // เคลียร์ Timeout เก่าเพื่อป้องกันปัญหาการซ่อนที่ตกค้างและทับซ้อน
+            // ถ้ามีวิดีโออยู่ในจอและระบบเสียงรวมยังถูกปิดอยู่ จะแสดงป๊อปอัพเสมอ!
+            if (isAnyVisible && isGlobalMuted) {
                 if (window.hidePromptTimeout) {
                     clearTimeout(window.hidePromptTimeout);
                     window.hidePromptTimeout = null;
@@ -541,7 +543,6 @@
                 
                 soundControls.classList.remove('hidden');
                 
-                // ใช้ setTimeout ให้คิวรอ DOM อัปเดต state hidden ออกไปก่อนนิดนึง
                 setTimeout(() => {
                     soundPrompt.classList.remove('translate-y-10', 'opacity-0');
                     soundPrompt.classList.add('translate-y-0', 'opacity-100');
@@ -555,26 +556,24 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
             
-            // นำ class ที่ใช้แสดงผลออก และใส่ class ซ่อนกลับไป
             soundPrompt.classList.remove('translate-y-0', 'opacity-100');
             soundPrompt.classList.add('opacity-0', 'translate-y-10');
             
-            // เคลียร์การทำงานเก่าเพื่อป้องกันการซ่อนทับซ้อนถ้าผู้ใช้เลื่อนหน้าไวๆ
             if (window.hidePromptTimeout) {
                 clearTimeout(window.hidePromptTimeout);
             }
             
-            // หน่วงเวลาให้ Transition Effect 0.6 วินาทีทำงานเสร็จก่อน แล้วค่อยซ่อนกล่องควบคุม
             window.hidePromptTimeout = setTimeout(() => {
                 soundControls.classList.add('hidden');
             }, 600);
         }
 
+        // เสริมความปลอดภัยด้วยการเช็คซ้ำทุกๆ 800ms เผื่อมีการโหลด DOM แทรก
         setInterval(() => {
-            if (Object.keys(window.ytPlayers).length > 0 && !window.soundPromptDismissed) {
+            if (document.querySelectorAll('.yt-video-wrapper').length > 0 && !window.soundPromptDismissed) {
                 window.updateSoundPromptVisibility();
             }
-        }, 1000);
+        }, 800);
 
         window.enableSound = () => {
             isGlobalMuted = false;
@@ -830,6 +829,8 @@
             setTimeout(() => {
                 if (typeof window.initYTPlayers === 'function') {
                     window.initYTPlayers();
+                    // อัปเดตเช็คหน้าต่างอัตโนมัติเมื่อจัดเรียงกรอบวิดีโอเสร็จ
+                    window.updateSoundPromptVisibility();
                 }
             }, 300);
         };
