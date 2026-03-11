@@ -335,7 +335,7 @@
             }, 2500); 
         });
 
-        // ดักจับเวลาผู้ใช้แตะ YouTube โดยตรง (โหมดประหยัดพลังงาน) เพื่อคลายการบล็อกเสียงอัตโนมัติ
+        // ดักจับเวลาผู้ใช้แตะ YouTube โดยตรง (โหมดประหยัดพลังงานกรณีหลุดรอด) เพื่อคลายการบล็อกเสียงอัตโนมัติ
         window.addEventListener('blur', () => {
             setTimeout(() => {
                 const active = document.activeElement;
@@ -351,6 +351,11 @@
                                 if (typeof player.unMute === 'function') {
                                     player.unMute(); 
                                     player.setVolume(100);
+                                    const state = player.getPlayerState();
+                                    if (state === 1 || state === 2 || state === 3) {
+                                        player.seekTo(0, true);
+                                        player.playVideo();
+                                    }
                                 }
                             } catch(e) {}
                         });
@@ -467,21 +472,19 @@
                                 'onStateChange': (event) => {
                                     const state = event.data;
                                     const isMuted = event.target.isMuted();
-                                    const overlay = document.getElementById('overlay-' + ytId);
                                     
-                                    // แสดงแผ่นใสทับวิดีโอ (เพื่อให้ผู้ใช้แตะเปิดเสียงได้) "เฉพาะตอนที่วิดีโอกำลังเล่นและโดนปิดเสียงอยู่เท่านั้น"
-                                    if (state === 1 && isMuted) {
-                                        if (overlay) overlay.classList.remove('hidden');
-                                    } else {
-                                        if (overlay) overlay.classList.add('hidden');
-                                    }
-
-                                    // กรณีผู้ใช้กดเปิดเสียงจากปุ่มของ YouTube โดยตรง
+                                    // หากผู้ใช้มีวิธีกดเล่นจากปุ่ม Native ของ YT เอง (หลุดรอดไปได้)
                                     if (isGlobalMuted && state === 1 && !isMuted) {
                                         isGlobalMuted = false;
                                         window.soundPromptDismissed = true;
                                         hidePrompt();
                                         document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
+                                    }
+
+                                    // บังคับเปิดเสียงทันทีถ้าระบบเสียงหลักถูกเปิดแล้ว
+                                    if (!isGlobalMuted && state === 1 && isMuted) {
+                                        event.target.unMute();
+                                        event.target.setVolume(100);
                                     }
                                     
                                     window.updateSoundPromptVisibility();
@@ -500,6 +503,7 @@
             window.soundPromptDismissed = true;
             hidePrompt(); 
             
+            // ซ่อนแผ่นใสทั้งหมด เพื่อให้ผู้ใช้กดควบคุมวิดีโอ (หยุด/ข้าม) ได้ปกติ
             document.querySelectorAll('.yt-magic-overlay').forEach(el => el.classList.add('hidden'));
 
             Object.keys(window.ytPlayers).forEach(id => {
@@ -511,7 +515,7 @@
                     }
                     if (id === ytId && typeof player.playVideo === 'function') {
                         // สั่งให้กลับไปที่ 0 วินาทีและเล่นเฉพาะวิดีโอที่ถูกจิ้ม
-                        player.seekTo(0);
+                        player.seekTo(0, true);
                         player.playVideo(); 
                     }
                 } catch(e) {}
@@ -520,7 +524,7 @@
             window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
         };
 
-        // --- ระบบอัปเดตป๊อปอัพเสียง (เช็ค 2 ชั้น: วิดีโอเล่นอยู่จริงๆ + อยู่ในระยะสายตา) ---
+        // --- ระบบอัปเดตป๊อปอัพเสียง (เช็ค 2 ชั้นเพื่อป้องกันการโชว์ผิดจังหวะในโหมดประหยัดพลังงาน) ---
         window.updateSoundPromptVisibility = () => {
             if (window.soundPromptDismissed) {
                 hidePrompt();
@@ -532,8 +536,8 @@
                 const player = window.ytPlayers[id];
                 try {
                     if (typeof player.getPlayerState === 'function') {
-                        // เช็คว่า State คือ 1 (เล่นอยู่) และ isMuted เป็นจริง (ถ้าเป็นโหมดประหยัดพลังงาน State จะเป็น -1 ดังนั้นป๊อปอัพจะไม่ขึ้น)
-                        if (player.getPlayerState() === 1 && player.isMuted()) {
+                        // เช็คว่า State คือ 1 (เล่นอยู่) และต้องเล่นไปแล้ว > 0.5 วินาที (ป้องกันการหลอกของระบบ)
+                        if (player.getPlayerState() === 1 && player.getCurrentTime() > 0.5 && player.isMuted()) {
                             const wrapper = document.querySelector(`[data-yt-id="${id}"]`);
                             if (wrapper) {
                                 const rect = wrapper.getBoundingClientRect();
@@ -550,7 +554,7 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
 
-            // ถ้ามีวิดีโอกำลังเล่นอยู่ในหน้าจอ และระบบเสียงรวมยังปิดอยู่ -> แสดงป๊อปอัพ
+            // ถ้ามีวิดีโอกำลังเล่นอยู่ในหน้าจอจริงๆ และระบบเสียงรวมยังปิดอยู่ -> แสดงป๊อปอัพ
             if (isAnyVisibleAndPlayingMuted && isGlobalMuted) {
                 if (window.hidePromptTimeout) {
                     clearTimeout(window.hidePromptTimeout);
@@ -606,9 +610,9 @@
                         player.unMute();
                         player.setVolume(100);
                         
-                        // รีสตาร์ท (seek ไปที่ 0) เฉพาะวิดีโอที่กำลังเล่นอยู่ (State = 1) เท่านั้น เพื่อไม่ให้วิดีโออื่นที่ยังไม่โหลดถูกกวน
+                        // รีสตาร์ท (seek ไปที่ 0) เฉพาะวิดีโอที่กำลังเล่นอยู่ (State = 1) เท่านั้น
                         if (player.getPlayerState() === 1) {
-                            player.seekTo(0);
+                            player.seekTo(0, true);
                             player.playVideo();
                             
                             if (!firstPlayingIframe) {
@@ -621,6 +625,7 @@
 
             window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
 
+            // โฟกัสวิดีโอที่กำลังเล่นอยู่ให้อยู่กึ่งกลางจอ
             if (firstPlayingIframe) {
                 const container = firstPlayingIframe.closest('.reveal-item') || firstPlayingIframe;
                 container.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -796,7 +801,8 @@
                                 ${videoId ? 
                                     `
                                     <div id="${ytId}" class="w-full h-full yt-video-placeholder" data-video-id="${videoId}"></div>
-                                    <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay flex items-center justify-center bg-transparent hidden" onclick="window.handleVideoTap('${ytId}')"></div>
+                                    <!-- นำ class hidden ออก เพื่อให้แผ่นใสดักจับการคลิกทุกครั้งที่มีการเปิดหน้าเว็บ -->
+                                    <div id="overlay-${ytId}" class="absolute inset-0 z-20 cursor-pointer yt-magic-overlay flex items-center justify-center bg-transparent" onclick="window.handleVideoTap('${ytId}')"></div>
                                     ` : 
                                     `<div class=\"flex flex-col items-center justify-center h-full text-zinc-700 p-4 text-center\">
                                         <i data-lucide=\"video-off\" class=\"w-8 h-8 mb-2 opacity-30\"></i>
