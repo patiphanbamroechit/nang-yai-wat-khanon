@@ -320,11 +320,12 @@
             const soundControls = document.getElementById('global-sound-controls');
             const soundPrompt = document.getElementById('sound-prompt');
             
-            // ปรากฏเมื่อมีวิดีโอที่กำลังเล่นแบบปิดเสียง (Autoplay-Muted) อยู่บนจอ และผู้ใช้ยังไม่ได้กดปุ่มเปิดเสียงถาวร
+            // ปรากฏเมื่อมีวิดีโอประเภท Autoplay-Muted (คลาส .autoplay-video) อยู่บนจอ และผู้ใช้ยังไม่ได้กดปุ่มเปิดเสียงถาวร
             if (visibleVideos.size > 0 && isGlobalMuted) {
                 soundControls.classList.remove('hidden');
                 setTimeout(() => soundPrompt.classList.remove('translate-y-10', 'opacity-0'), 50);
             } else {
+                // หากไม่มีวิดีโอที่เล่นแบบ Autoplay อยู่ในจอเลย ให้ซ่อนปุ่มป๊อปอัพทันที
                 soundPrompt.classList.add('opacity-0', 'translate-y-10');
                 setTimeout(() => soundControls.classList.add('hidden'), 500);
             }
@@ -343,6 +344,7 @@
                 window.showToast('เปิดเสียงวิดีโอเรียบร้อยแล้ว', 'success');
             }, 500);
 
+            // เปลี่ยนลิงก์ iframe เฉพาะที่มีพารามิเตอร์ mute=1
             const iframes = document.querySelectorAll('.video-iframe');
             let firstIframe = null;
             
@@ -427,7 +429,7 @@
                     const muteParam = isGlobalMuted ? 1 : 0;
                     return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muteParam}&rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
                 } else {
-                    // แบบปกติ (Manual Play) จะไม่มี autoplay=1 และ mute=1
+                    // แบบปกติ (Manual Play) จะไม่มี autoplay=1 และ mute=1 เพื่อให้ขึ้นหน้าปกยูทูปปกติ
                     return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&enablejsapi=1&origin=${origin}&widget_referrer=${origin}&vq=hd1080`;
                 }
             }
@@ -504,9 +506,11 @@
                         visibleVideos.delete(videoId);
                     }
                 });
+                // อัปเดตการแสดงผลปุ่มเปิดเสียงทันทีเมื่อสถานะวิดีโอในจอเปลี่ยน
                 window.updateSoundPromptVisibility();
-            }, { threshold: 0.2 });
+            }, { threshold: 0.1 }); // ปรับ threshold ให้อ่อนลงเพื่อให้ตรวจจับได้เร็วขึ้น
 
+            // ตรวจจับเฉพาะ iframe ที่มีคลาส autoplay-video เท่านั้น
             document.querySelectorAll('.autoplay-video').forEach(el => {
                 videoObserver.observe(el);
             });
@@ -514,7 +518,7 @@
 
         const renderViewerLinks = () => {
             const visibleLinks = links.filter(link => link.status !== 'hide');
-            visibleVideos.clear(); // Reset visible set before re-render
+            visibleVideos.clear(); 
             
             if (visibleLinks.length === 0) {
                 if (isInitialLoad) {
@@ -548,11 +552,14 @@
                         </div>
                     `;
                 } else if (link.type === 'video') {
-                    // เช็คว่าวิดีโอนี้ควรเล่นอัตโนมัติหรือไม่ (ในที่นี้เรากำหนดให้วิดีโอทั้งหมดเป็น Autoplay-Muted เพื่อความทันสมัย แต่จะขึ้นป๊อปอัพตามเงื่อนไขที่กำหนด)
-                    // หากต้องการให้บางวิดีโอ "ไม่เพล" ต้องส่งพารามิเตอร์ false เข้าไปใน getEmbedUrl
+                    // ตรวจสอบว่าควรเล่นอัตโนมัติหรือไม่ 
+                    // (กรณีนี้เราตั้งเป็น Autoplay=true เสมอเพื่อประสบการณ์ที่ลื่นไหล แต่จะแยกคลาสเพื่อให้ระบบป๊อปอัพทำงานเฉพาะตัวที่เล่นแบบไม่มีเสียง)
                     const isAutoplay = true; 
                     const embedUrl = getEmbedUrl(link.url, isAutoplay);
                     const ratio = link.ratio || '16/9';
+                    
+                    // สำคัญ: ถ้าเป็น Manual Play (isAutoplay=false) คลาส autoplay-video จะไม่ถูกใส่ลงไป 
+                    // ทำให้ระบบ Observer ข้ามไปและป๊อปอัพจะไม่ขึ้น
                     const videoClass = isAutoplay ? 'video-iframe autoplay-video' : 'video-iframe';
                     
                     return `
@@ -607,7 +614,7 @@
             }).join('');
             
             lucide.createIcons();
-            initVideoObserver(); // เริ่มระบบสังเกตการณ์วิดีโอหลังเรนเดอร์เสร็จ
+            initVideoObserver(); 
         };
 
         const renderAdminLinks = () => {
