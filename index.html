@@ -140,10 +140,22 @@
             renderApp(); 
         });
 
+        // Analytics Guard - Optimized for Canvas Environment
+        let isRecordProcessing = false;
         const recordVisit = async () => {
-            if (!currentUser || isAdminAuthorized || sessionStorage.getItem('visited_logged') === 'true') return;
+            // นับเฉพาะหน้าหลักเท่านั้น และต้องไม่ใช่ Admin ที่ล็อกอินอยู่
+            const isMainPage = window.location.hash === '' || window.location.hash === '#';
+            
+            // เปลี่ยนจาก sessionStorage เป็น localStorage เพื่อให้จำเครื่องได้ถาวร
+            const hasAlreadyVisited = localStorage.getItem('visited_logged_' + app_id_path) === 'true';
 
+            if (!isMainPage || !currentUser || isAdminAuthorized || hasAlreadyVisited || isRecordProcessing) return;
+
+            isRecordProcessing = true;
             try {
+                // มาร์คว่านับแล้วในเครื่องนี้ทันทีก่อนเขียน Firebase เพื่อป้องกันคำสั่งที่รันพร้อมกัน
+                localStorage.setItem('visited_logged_' + app_id_path, 'true');
+
                 const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
                 const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
 
@@ -157,10 +169,12 @@
                     timestamp: Date.now(),
                     userAgent: navigator.userAgent
                 });
-
-                sessionStorage.setItem('visited_logged', 'true');
             } catch (e) {
                 console.error("Analytics Error:", e);
+                // ในกรณีที่บันทึก Firebase พลาด อาจพิจารณาเอาออกเพื่อให้เครื่องนี้มีโอกาสบันทึกใหม่
+                // localStorage.removeItem('visited_logged_' + app_id_path);
+            } finally {
+                isRecordProcessing = false;
             }
         };
 
