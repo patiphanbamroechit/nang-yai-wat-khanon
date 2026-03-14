@@ -68,6 +68,23 @@
         const editModal = document.getElementById('edit-modal');
         const siteStatusBtn = document.getElementById('site-status-toggle');
 
+        // Image State Handlers
+        window.handleImageLoad = (id) => {
+            const loader = document.getElementById(`loader-${id}`);
+            if (loader) loader.classList.add('hidden');
+            const img = document.getElementById(`img-${id}`);
+            if (img) img.classList.remove('opacity-0');
+        };
+
+        window.handleImageError = (id) => {
+            const loader = document.getElementById(`loader-${id}`);
+            if (loader) loader.classList.add('hidden');
+            const errorPlaceholder = document.getElementById(`error-${id}`);
+            if (errorPlaceholder) errorPlaceholder.classList.remove('hidden');
+            const img = document.getElementById(`img-${id}`);
+            if (img) img.classList.add('hidden');
+        };
+
         // Global Toast Notification System
         window.toastTimeout = null;
         window.showToast = (message, type = 'success') => {
@@ -576,8 +593,24 @@
                                 <h3 class=\"text-white text-[10px] md:text-[11px] font-medium opacity-60 uppercase tracking-wider\">${link.title}</h3>
                                 ${shareBtnHtml}
                             </div>
-                            <div class=\"relative overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl mt-2 bg-zinc-900/10 group cursor-pointer\" onclick=\"window.openLightbox('${link.url}')\">
-                                <img src=\"${link.url}\" alt=\"${link.title}\" class=\"w-full h-auto object-contain block mx-auto transition-transform duration-700 group-hover:scale-105\" onerror=\"this.src='https://via.placeholder.com/800x450?text=Image+Not+Found'\">
+                            <div class=\"relative overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl mt-2 bg-zinc-900/10 group cursor-pointer min-h-[150px] flex items-center justify-center\" onclick=\"window.openLightbox('${link.url}')\">
+                                <!-- Image Loading Spinner -->
+                                <div id="loader-${link.id}" class="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/30 z-10 transition-opacity duration-300">
+                                    <div class="w-8 h-8 border-2 border-zinc-800 border-t-red-600 rounded-full animate-spin"></div>
+                                    <p class="text-[7px] text-zinc-600 uppercase tracking-widest mt-2 font-light">Loading Image</p>
+                                </div>
+                                
+                                <!-- Image Error Placeholder -->
+                                <div id="error-${link.id}" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 z-20">
+                                    <i data-lucide="image-off" class="w-8 h-8 text-zinc-700 mb-2"></i>
+                                    <p class="text-[8px] text-zinc-600 uppercase tracking-widest font-bold">Image Failed to Load</p>
+                                </div>
+
+                                <img id="img-${link.id}" src=\"${link.url}\" alt=\"${link.title}\" 
+                                    class=\"w-full h-auto object-contain block mx-auto transition-all duration-700 group-hover:scale-105 opacity-0\" 
+                                    onload=\"window.handleImageLoad('${link.id}')\" 
+                                    onerror=\"window.handleImageError('${link.id}')\">
+                                
                                 <div class=\"absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none\">
                                     <i data-lucide=\"zoom-in\" class=\"text-white w-8 h-8 opacity-70\"></i>
                                 </div>
