@@ -27,20 +27,20 @@
         import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, writeBatch, increment, arrayUnion, getDocs, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration (Using Environment Variables for Permissions) ---
+        // --- Firebase Configuration (อัปเดตเป็นโปรเจกต์ใหม่) ---
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : {
-                apiKey: "AIzaSyDo5SurxNWO9Sw9T2ReiL39bC5dBE8gUn4",
-                authDomain: "nang-yai-wat-khanon.firebaseapp.com",
-                projectId: "nang-yai-wat-khanon",
-                storageBucket: "nang-yai-wat-khanon.firebasestorage.app",
-                messagingSenderId: "1086671348220",
-                appId: "1:1086671348220:web:a693ade119139eb4ee9279",
-                measurementId: "G-N8CVF98TZX"
+                apiKey: "AIzaSyDUXhfb7zd_U7KOrUWMh-2kdroiJk79lZE",
+                authDomain: "nang-yai.firebaseapp.com",
+                projectId: "nang-yai",
+                storageBucket: "nang-yai.firebasestorage.app",
+                messagingSenderId: "764458578347",
+                appId: "1:764458578347:web:d48378c78fb02f6f1b22ee",
+                measurementId: "G-YT5411SB9F"
             };
 
-        const app_id_path = typeof __app_id !== 'undefined' ? __app_id : "nang-yai-wat-khanon-project";
+        const app_id_path = typeof __app_id !== 'undefined' ? __app_id : "nang-yai-project";
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
         const auth = getAuth(app);
@@ -141,9 +141,13 @@
                 }
             } catch (error) {
                 console.error("Auth error:", error);
-                // แสดงข้อความแจ้งเตือนเมื่ออยู่บน Host จริงแล้วยังไม่ได้เปิด Anonymous Auth
+                // เปลี่ยนปุ่มสถานะให้แสดงข้อผิดพลาดถ้า Login Anonymously ล้มเหลว
+                if (siteStatusBtn) {
+                    siteStatusBtn.innerHTML = '<span class="text-red-500 font-bold text-[10px]">❌ AUTH FAILED</span>';
+                    siteStatusBtn.className = "px-3 py-2 border border-red-900/50 rounded-xl transition-all shadow-lg bg-red-600/10";
+                }
                 setTimeout(() => {
-                    if(window.showToast) window.showToast('การเชื่อมต่อ Database ล้มเหลว โปรดตรวจสอบสิทธิ์ Firebase', 'error');
+                    if(window.showToast) window.showToast('การเชื่อมต่อล้มเหลว: โปรดเปิดใช้งาน Anonymous Auth ใน Firebase', 'error');
                 }, 2000);
             }
         };
@@ -155,7 +159,6 @@
                 setupAnalyticsListeners();
                 renderApp(); 
             } else {
-                // โหลดโครงสร้างหน้าเว็บขึ้นมาเสมอ แม้ว่า Firebase Auth จะยังตั้งค่าไม่สมบูรณ์
                 renderApp();
             }
         });
@@ -164,9 +167,7 @@
         let isRecordProcessing = false;
         const recordVisit = async () => {
             if (!currentUser) return;
-            // นับเฉพาะหน้าหลักเท่านั้น และต้องไม่ใช่ Admin ที่ล็อกอินอยู่
             const isMainPage = window.location.hash === '' || window.location.hash === '#';
-            
             const hasAlreadyVisited = localStorage.getItem('visited_logged_' + app_id_path) === 'true';
 
             if (!isMainPage || isAdminAuthorized || hasAlreadyVisited || isRecordProcessing) return;
@@ -355,7 +356,17 @@
                 }
                 updateStatusUI();
                 renderApp();
-            }, (err) => console.error("Config Listener Error:", err));
+            }, (err) => {
+                console.error("Config Listener Error:", err);
+                // แสดงผลปุ่มสถานะว่าติดปัญหา Firestore Rules
+                if (siteStatusBtn) {
+                    siteStatusBtn.innerHTML = '<span class="text-yellow-500 font-bold text-[10px]">⚠️ DB BLOCKED</span>';
+                    siteStatusBtn.className = "px-3 py-2 border border-yellow-900/50 rounded-xl transition-all shadow-lg bg-yellow-600/10";
+                }
+                if (err.code === 'permission-denied') {
+                    setTimeout(() => window.showToast('Firestore Rules บล็อกการอ่านข้อมูล โปรดแก้ไขเป็น allow read, write: if true;', 'error'), 1000);
+                }
+            });
         };
 
         const updateStatusUI = () => {
@@ -770,7 +781,11 @@
                         window.showToast('อัปเดตลำดับเรียบร้อย', 'success');
                     } catch (err) { 
                         console.error("Reorder error:", err);
-                        window.showToast('อัปเดตลำดับไม่สำเร็จ', 'error');
+                        if (err.code === 'permission-denied') {
+                            window.showToast('อัปเดตไม่ได้! ติดสิทธิ์ Firestore Rules', 'error');
+                        } else {
+                            window.showToast('อัปเดตลำดับไม่สำเร็จ', 'error');
+                        }
                     }
                 }
             });
@@ -783,7 +798,11 @@
                 window.showToast(newStatus === 'show' ? 'เปิดการแสดงผลรายการนี้แล้ว' : 'ซ่อนรายการนี้เรียบร้อยแล้ว', 'success');
             } catch (err) { 
                 console.error(err); 
-                window.showToast('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ', 'error');
+                if (err.code === 'permission-denied') {
+                    window.showToast('เปลี่ยนสถานะไม่ได้! ติดสิทธิ์ Firestore Rules', 'error');
+                } else {
+                    window.showToast('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ', 'error');
+                }
             }
         };
 
@@ -794,7 +813,11 @@
                 window.showToast(`เปลี่ยนเป็นสถานะ ${newStatus === 'open' ? 'ออนไลน์' : 'ปิดปรับปรุง'} เรียบร้อย`, newStatus === 'open' ? 'success' : 'error');
             } catch (err) { 
                 console.error(err); 
-                window.showToast('ไม่สามารถเปลี่ยนสถานะได้', 'error');
+                if (err.code === 'permission-denied') {
+                    window.showToast('เปลี่ยนไม่ได้! ติดสิทธิ์ Firestore Rules', 'error');
+                } else {
+                    window.showToast('ไม่สามารถเปลี่ยนสถานะได้', 'error');
+                }
             }
         };
 
@@ -1003,7 +1026,11 @@
                 window.showToast('บันทึกการแก้ไขเรียบร้อย', 'success');
             } catch (err) { 
                 console.error(err); 
-                window.showToast('บันทึกการแก้ไขไม่สำเร็จ', 'error');
+                if (err.code === 'permission-denied') {
+                    window.showToast('แก้ไขไม่ได้! ติดสิทธิ์ Firestore Rules', 'error');
+                } else {
+                    window.showToast('บันทึกการแก้ไขไม่สำเร็จ', 'error');
+                }
             }
         };
 
@@ -1025,7 +1052,12 @@
                 window.showToast('เพิ่มรายการใหม่เรียบร้อย', 'success');
             } catch (err) { 
                 console.error(err); 
-                window.showToast('เพิ่มรายการไม่สำเร็จ', 'error');
+                // เพิ่มระบบตรวจสอบ Error ชนิด Permission Denied (ปัญหาที่เจอบ่อยที่สุด)
+                if (err.code === 'permission-denied') {
+                    window.showToast('เพิ่มไม่ได้! โปรดปลดล็อก Firestore Rules (Permission Denied)', 'error');
+                } else {
+                    window.showToast('เพิ่มรายการไม่สำเร็จ', 'error');
+                }
             }
         };
 
@@ -1054,7 +1086,11 @@
                 window.showToast('ลบรายการเรียบร้อยแล้ว', 'success');
             } catch (e) {
                 console.error(e);
-                window.showToast('เกิดข้อผิดพลาดในการลบรายการ', 'error');
+                if (e.code === 'permission-denied') {
+                    window.showToast('ลบไม่ได้! ติดสิทธิ์ Firestore Rules', 'error');
+                } else {
+                    window.showToast('เกิดข้อผิดพลาดในการลบรายการ', 'error');
+                }
             }
         };
 
@@ -1068,6 +1104,14 @@
         };
 
         window.addEventListener('hashchange', renderApp);
+        
+        // ให้ค่าเริ่มต้นปุ่มออนไลน์เป็นสถานะกำลังโหลด (กันปุ่มหายไปเลยตอนไม่ได้เชื่อมต่อ)
+        const initSiteStatusBtn = document.getElementById('site-status-toggle');
+        if(initSiteStatusBtn) {
+            initSiteStatusBtn.innerHTML = '<span class="text-zinc-500 font-bold text-[10px]">⏳ CONNECTING...</span>';
+            initSiteStatusBtn.className = "px-3 py-2 border border-zinc-800 rounded-xl transition-all shadow-lg";
+        }
+        
         initAuth();
     </script>
 
