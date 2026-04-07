@@ -136,6 +136,10 @@
                 }
             } catch (error) {
                 console.error("Auth error:", error);
+                // แสดงข้อความแจ้งเตือนเมื่ออยู่บน Host จริงแล้วยังไม่ได้เปิด Anonymous Auth
+                setTimeout(() => {
+                    if(window.showToast) window.showToast('การเชื่อมต่อ Database ล้มเหลว โปรดตรวจสอบ Firebase', 'error');
+                }, 2000);
             }
         };
 
@@ -145,6 +149,9 @@
                 loadSiteConfig(); 
                 setupAnalyticsListeners();
                 renderApp(); 
+            } else {
+                // แก้ไข: โหลดโครงสร้างหน้าเว็บขึ้นมาเสมอ แม้ว่า Firebase Auth จะยังตั้งค่าไม่สมบูรณ์
+                renderApp();
             }
         });
 
