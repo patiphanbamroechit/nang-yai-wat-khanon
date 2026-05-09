@@ -24,27 +24,27 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, writeBatch, increment, arrayUnion, getDocs, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration (อัปเดตเป็นโปรเจกต์ใหม่) ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
-                apiKey: "AIzaSyDUXhfb7zd_U7KOrUWMh-2kdroiJk79lZE",
-                authDomain: "nang-yai.firebaseapp.com",
-                projectId: "nang-yai",
-                storageBucket: "nang-yai.firebasestorage.app",
-                messagingSenderId: "764458578347",
-                appId: "1:764458578347:web:d48378c78fb02f6f1b22ee",
-                measurementId: "G-YT5411SB9F"
-            };
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDo5SurxNWO9Sw9T2ReiL39bC5dBE8gUn4",
+            authDomain: "nang-yai-wat-khanon.firebaseapp.com",
+            databaseURL: "https://nang-yai-wat-khanon-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "nang-yai-wat-khanon",
+            storageBucket: "nang-yai-wat-khanon.firebasestorage.app",
+            messagingSenderId: "1086671348220",
+            appId: "1:1086671348220:web:a693ade119139eb4ee9279",
+            measurementId: "G-N8CVF98TZX"
+        };
 
-        const app_id_path = typeof __app_id !== 'undefined' ? __app_id : "nang-yai-project";
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        const app_id_path = "nang-yai-wat-khanon-project";
 
         let currentUser = null;
         let links = [];
@@ -134,11 +134,7 @@
 
         const initAuth = async () => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
             } catch (error) {
                 console.error("Auth error:", error);
                 // เปลี่ยนปุ่มสถานะให้แสดงข้อผิดพลาดถ้า Login Anonymously ล้มเหลว
@@ -163,18 +159,18 @@
             }
         });
 
-        // Analytics Guard - Optimized for Canvas Environment
+        // Analytics Guard
         let isRecordProcessing = false;
         const recordVisit = async () => {
             if (!currentUser) return;
             const isMainPage = window.location.hash === '' || window.location.hash === '#';
-            const hasAlreadyVisited = localStorage.getItem('visited_logged_' + app_id_path) === 'true';
+            const hasAlreadyVisited = localStorage.getItem('visited_logged_nang-yai') === 'true';
 
             if (!isMainPage || isAdminAuthorized || hasAlreadyVisited || isRecordProcessing) return;
 
             isRecordProcessing = true;
             try {
-                localStorage.setItem('visited_logged_' + app_id_path, 'true');
+                localStorage.setItem('visited_logged_nang-yai', 'true');
 
                 const summaryRef = doc(db, 'artifacts', app_id_path, 'public', 'data', 'analytics', 'summary');
                 const logsRef = collection(db, 'artifacts', app_id_path, 'public', 'data', 'visitor_logs');
@@ -190,7 +186,11 @@
                     userAgent: navigator.userAgent
                 });
             } catch (e) {
-                console.error("Analytics Error:", e);
+                if (e.code === 'permission-denied') {
+                    console.warn("Analytics Warning: ติดสิทธิ์ Firestore Rules ไม่สามารถบันทึกสถิติได้");
+                } else {
+                    console.error("Analytics Error:", e);
+                }
             } finally {
                 isRecordProcessing = false;
             }
@@ -212,7 +212,13 @@
                         if(document.getElementById('admin-total-views')) document.getElementById('admin-total-views').innerText = total;
                         if(document.getElementById('admin-unique-views')) document.getElementById('admin-unique-views').innerText = unique;
                     }
-                }, (err) => console.error("Summary Listener Error:", err));
+                }, (err) => {
+                    if (err.code === 'permission-denied') {
+                        console.warn("Summary Listener Warning: ติดสิทธิ์ Firestore Rules ไม่สามารถดึงข้อมูลสถิติได้");
+                    } else {
+                        console.error("Summary Listener Error:", err);
+                    }
+                });
             }
 
             if (isAdminAuthorized) {
@@ -247,7 +253,13 @@
                                 }).join('');
                             }
                         }
-                    }, (err) => console.error("Logs Listener Error:", err));
+                    }, (err) => {
+                        if (err.code === 'permission-denied') {
+                            console.warn("Logs Listener Warning: ติดสิทธิ์ Firestore Rules ไม่สามารถดึงประวัติผู้เข้าชมได้");
+                        } else {
+                            console.error("Logs Listener Error:", err);
+                        }
+                    });
                 }
             } else {
                 if (logsListenerUnsubscribe) {
@@ -357,14 +369,14 @@
                 updateStatusUI();
                 renderApp();
             }, (err) => {
-                console.error("Config Listener Error:", err);
-                // แสดงผลปุ่มสถานะว่าติดปัญหา Firestore Rules
-                if (siteStatusBtn) {
-                    siteStatusBtn.innerHTML = '<span class="text-yellow-500 font-bold text-[10px]">⚠️ DB BLOCKED</span>';
-                    siteStatusBtn.className = "px-3 py-2 border border-yellow-900/50 rounded-xl transition-all shadow-lg bg-yellow-600/10";
-                }
                 if (err.code === 'permission-denied') {
-                    setTimeout(() => window.showToast('Firestore Rules บล็อกการอ่านข้อมูล โปรดแก้ไขเป็น allow read, write: if true;', 'error'), 1000);
+                    console.warn("Config Listener Warning: ติดสิทธิ์ Firestore Rules ไม่สามารถดึงตั้งค่าระบบได้");
+                    if (siteStatusBtn) {
+                        siteStatusBtn.innerHTML = '<span class="text-yellow-500 font-bold text-[10px]">⚠️ DB BLOCKED</span>';
+                        siteStatusBtn.className = "px-3 py-2 border border-yellow-900/50 rounded-xl transition-all shadow-lg bg-yellow-600/10";
+                    }
+                } else {
+                    console.error("Config Listener Error:", err);
                 }
             });
         };
@@ -470,9 +482,24 @@
                 if (isAdmin) renderAdminLinks();
                 else renderViewerLinks();
             }, (error) => {
-                console.error("Firestore error:", error);
                 isInitialLoad = false;
-                if (!isAdmin) renderViewerLinks(); // Force render empty state on error
+                if (error.code === 'permission-denied') {
+                    console.warn("Firestore Warning: ติดสิทธิ์ Firestore Rules ไม่สามารถดึงข้อมูลแกลเลอรี่ได้");
+                    if (!isAdmin) {
+                        linksContainer.innerHTML = `
+                            <div class="text-center py-20 bg-red-900/10 rounded-3xl border border-red-800/50">
+                                <i data-lucide="lock" class="w-8 h-8 mx-auto text-red-500 mb-4 opacity-80"></i>
+                                <p class="text-red-500 text-[11px] uppercase tracking-[0.2em] font-bold mb-2">Access Denied</p>
+                                <p class="text-zinc-400 text-[10px] mb-6 font-light px-4">โปรดตั้งค่า Firestore Rules ใน Firebase Console ให้เป็น allow read, write: if true;</p>
+                            </div>
+                        `;
+                        lucide.createIcons();
+                    }
+                    window.showToast('ติดสิทธิ์ Firestore Rules', 'error');
+                } else {
+                    console.error("Firestore error:", error);
+                    if (!isAdmin) renderViewerLinks(); // Force render empty state on error
+                }
             });
         };
 
