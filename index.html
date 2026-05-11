@@ -232,7 +232,7 @@
                         const tbody = document.getElementById('admin-visitor-logs');
                         if(tbody) {
                             if (logs.length === 0) {
-                                tbody.innerHTML = '<tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>';
+                                tbody.innerHTML = '<tr><td colspan="3" class="py-6 lg:py-10 text-center text-zinc-700 italic">No logs available</td></tr>';
                             } else {
                                 tbody.innerHTML = logs.slice(0, 50).map(log => {
                                     const date = new Date(log.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
@@ -246,9 +246,9 @@
                                     else if(parsedUa.includes('Linux')) device = 'Linux';
                                     
                                     return `<tr class="border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors">
-                                        <td class="py-3 px-4">${date}</td>
-                                        <td class="py-3 px-4 text-[7px] text-zinc-500 font-mono tracking-widest">${log.uid.substring(0,8)}...</td>
-                                        <td class="py-3 px-4 text-zinc-300" title="${log.userAgent}">${device}</td>
+                                        <td class="py-3 px-4 lg:py-4 lg:px-6">${date}</td>
+                                        <td class="py-3 px-4 lg:py-4 lg:px-6 text-[7px] lg:text-[10px] text-zinc-500 font-mono tracking-widest">${log.uid.substring(0,8)}...</td>
+                                        <td class="py-3 px-4 lg:py-4 lg:px-6 text-zinc-300" title="${log.userAgent}">${device}</td>
                                     </tr>`;
                                 }).join('');
                             }
@@ -937,10 +937,10 @@
                 const date = new Date(item.lastVisit).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
                 return `
                     <tr class="border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors">
-                        <td class="py-3 px-4 text-white text-center font-bold">${item.count}</td>
-                        <td class="py-3 px-4 text-[7px] text-zinc-500 font-mono tracking-widest">${item.uid.substring(0,8)}...</td>
-                        <td class="py-3 px-4 text-zinc-300">${item.device}</td>
-                        <td class="py-3 px-4 text-zinc-500 text-[8px]">${date}</td>
+                        <td class="py-3 px-4 lg:py-4 lg:px-6 text-white text-center font-bold">${item.count}</td>
+                        <td class="py-3 px-4 lg:py-4 lg:px-6 text-[7px] lg:text-[10px] text-zinc-500 font-mono tracking-widest">${item.uid.substring(0,8)}...</td>
+                        <td class="py-3 px-4 lg:py-4 lg:px-6 text-zinc-300">${item.device}</td>
+                        <td class="py-3 px-4 lg:py-4 lg:px-6 text-zinc-500 text-[8px] lg:text-[10px]">${date}</td>
                     </tr>
                 `;
             }).join('');
@@ -997,7 +997,7 @@
                 window.closeClearAnalytics();
                 
                 window.currentLogsData = [];
-                document.getElementById('admin-visitor-logs').innerHTML = '<tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>';
+                document.getElementById('admin-visitor-logs').innerHTML = '<tr><td colspan="3" class="py-6 lg:py-10 text-center text-zinc-700 italic">No logs available</td></tr>';
 
                 window.showToast('ล้างข้อมูลสถิติเรียบร้อยแล้ว', 'success');
             } catch (e) {
@@ -1440,54 +1440,54 @@
             </div>
 
             <!-- ล่างสุด: Analytics & Visitor Logs -->
-            <div class="lg:col-span-5 w-full min-w-0 mt-4 md:mt-8">
-                <div class="bg-zinc-900/10 p-4 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-zinc-900 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                        <h2 class="text-[10px] md:text-xs font-bold flex items-center uppercase tracking-[0.2em] text-zinc-600">
-                            <span class="w-1 h-3 bg-zinc-500 mr-3 rounded-full text-left"></span> Analytics & Logs
+            <div class="lg:col-span-5 w-full min-w-0 mt-4 md:mt-8 lg:mt-12">
+                <div class="bg-zinc-900/10 p-4 md:p-8 lg:p-12 rounded-3xl md:rounded-[2.5rem] lg:rounded-[3rem] border border-zinc-900 shadow-lg backdrop-blur-md w-full box-border overflow-hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 lg:gap-6 mb-6 lg:mb-10">
+                        <h2 class="text-[10px] md:text-xs lg:text-sm font-bold flex items-center uppercase tracking-[0.2em] text-zinc-600">
+                            <span class="w-1 h-3 lg:h-4 bg-zinc-500 mr-3 rounded-full text-left"></span> Analytics & Logs
                         </h2>
                         <!-- กลุ่มปุ่มจัดการข้อมูล -->
-                        <div class="flex gap-2 w-full md:w-auto">
-                            <button onclick="window.confirmClearAnalytics()" class="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-red-900/10 text-red-500 border border-red-900/30 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-red-900/40 hover:text-red-300 transition-all">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Data
+                        <div class="flex gap-2 lg:gap-4 w-full md:w-auto">
+                            <button onclick="window.confirmClearAnalytics()" class="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 lg:px-6 lg:py-3 bg-red-900/10 text-red-500 border border-red-900/30 rounded-xl lg:rounded-2xl text-[8px] lg:text-[10px] font-bold uppercase tracking-widest hover:bg-red-900/40 hover:text-red-300 transition-all">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5 lg:w-4 lg:h-4"></i> Clear Data
                             </button>
-                            <button onclick="window.exportCSV()" class="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-green-900/20 text-green-600 border border-green-900/50 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-green-800 hover:text-white transition-all">
-                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+                            <button onclick="window.exportCSV()" class="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 lg:px-6 lg:py-3 bg-green-900/20 text-green-600 border border-green-900/50 rounded-xl lg:rounded-2xl text-[8px] lg:text-[10px] font-bold uppercase tracking-widest hover:bg-green-800 hover:text-white transition-all">
+                                <i data-lucide="download" class="w-3.5 h-3.5 lg:w-4 lg:h-4"></i> Export CSV
                             </button>
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <div onclick="window.openAnalyticsSummary()" class="group bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/80 hover:border-zinc-700 transition-all relative overflow-hidden">
-                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 text-zinc-700 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
-                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2 group-hover:text-zinc-400 transition-colors">Total Views</p>
-                            <p id="admin-total-views" class="text-2xl md:text-3xl text-white font-light tracking-tighter">0</p>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-12">
+                        <div onclick="window.openAnalyticsSummary()" class="group bg-black/40 p-5 lg:p-8 rounded-2xl lg:rounded-3xl border border-zinc-800/50 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/80 hover:border-zinc-700 transition-all relative overflow-hidden">
+                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 lg:w-4 lg:h-4 text-zinc-700 absolute top-3 right-3 lg:top-4 lg:right-4 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <p class="text-[8px] lg:text-[10px] text-zinc-500 uppercase tracking-widest mb-2 lg:mb-3 group-hover:text-zinc-400 transition-colors">Total Views</p>
+                            <p id="admin-total-views" class="text-2xl md:text-3xl lg:text-5xl text-white font-light tracking-tighter">0</p>
                         </div>
-                        <div onclick="window.openAnalyticsSummary()" class="group bg-black/40 p-5 rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/80 hover:border-zinc-700 transition-all relative overflow-hidden">
-                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 text-zinc-700 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
-                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2 group-hover:text-zinc-400 transition-colors">Unique Viewers</p>
-                            <p id="admin-unique-views" class="text-2xl md:text-3xl text-zinc-300 font-light tracking-tighter">0</p>
+                        <div onclick="window.openAnalyticsSummary()" class="group bg-black/40 p-5 lg:p-8 rounded-2xl lg:rounded-3xl border border-zinc-800/50 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/80 hover:border-zinc-700 transition-all relative overflow-hidden">
+                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 lg:w-4 lg:h-4 text-zinc-700 absolute top-3 right-3 lg:top-4 lg:right-4 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <p class="text-[8px] lg:text-[10px] text-zinc-500 uppercase tracking-widest mb-2 lg:mb-3 group-hover:text-zinc-400 transition-colors">Unique Viewers</p>
+                            <p id="admin-unique-views" class="text-2xl md:text-3xl lg:text-5xl text-zinc-300 font-light tracking-tighter">0</p>
                         </div>
-                        <div class="bg-black/40 p-5 rounded-2xl border border-zinc-800/50 col-span-2 flex flex-col items-center justify-center text-center px-4">
-                            <p class="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">System Status</p>
-                            <p class="text-[9px] text-green-700 uppercase tracking-widest font-bold">Tracking Active</p>
-                            <p class="text-[7px] text-zinc-600 mt-1 uppercase tracking-widest">Auto-updating metrics (Showing Top 50)</p>
+                        <div class="bg-black/40 p-5 lg:p-8 rounded-2xl lg:rounded-3xl border border-zinc-800/50 col-span-2 flex flex-col items-center justify-center text-center px-4">
+                            <p class="text-[8px] lg:text-[10px] text-zinc-500 uppercase tracking-widest mb-2 lg:mb-3">System Status</p>
+                            <p class="text-[9px] lg:text-sm text-green-700 uppercase tracking-widest font-bold">Tracking Active</p>
+                            <p class="text-[7px] lg:text-[9px] text-zinc-600 mt-1 lg:mt-2 uppercase tracking-widest">Auto-updating metrics (Showing Top 50)</p>
                         </div>
                     </div>
 
-                    <div class="w-full border border-zinc-900 rounded-2xl overflow-hidden bg-black/20">
-                        <div class="max-h-64 overflow-y-auto custom-scrollbar">
-                            <table class="w-full text-left text-[9px] text-zinc-400 border-collapse">
-                                <thead class="sticky top-0 bg-[#070707] uppercase tracking-widest text-zinc-600 text-[8px] border-b border-zinc-800 z-10">
+                    <div class="w-full border border-zinc-900 rounded-2xl lg:rounded-3xl overflow-hidden bg-black/20">
+                        <div class="max-h-64 lg:max-h-96 overflow-y-auto custom-scrollbar">
+                            <table class="w-full text-left text-[9px] lg:text-xs text-zinc-400 border-collapse">
+                                <thead class="sticky top-0 bg-[#070707] uppercase tracking-widest text-zinc-600 text-[8px] lg:text-[10px] border-b border-zinc-800 z-10">
                                     <tr>
-                                        <th class="py-3 px-4 font-normal">Timestamp</th>
-                                        <th class="py-3 px-4 font-normal">UID (Hash)</th>
-                                        <th class="py-3 px-4 font-normal">Device / Platform</th>
+                                        <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal">Timestamp</th>
+                                        <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal">UID (Hash)</th>
+                                        <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal">Device / Platform</th>
                                     </tr>
                                 </thead>
-                                <tbody id="admin-visitor-logs" class="divide-y divide-zinc-900/50 relative z-0">
+                                <tbody id="admin-visitor-logs" class="divide-y divide-zinc-900/50 relative z-0 text-[9px] md:text-[10px] lg:text-xs">
                                     <!-- Logs -->
-                                    <tr><td colspan="3" class="py-6 text-center text-zinc-700 italic">No logs available</td></tr>
+                                    <tr><td colspan="3" class="py-6 lg:py-10 text-center text-zinc-700 italic">No logs available</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1581,34 +1581,34 @@
 
     <!-- Modal ดูสรุปข้อมูลแบบละเอียด (Detailed Summary) -->
     <div id="analytics-summary-modal" class="hidden fixed inset-0 z-[1200] items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
-        <div class="bg-[#0a0a0a] border border-zinc-800 p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col relative">
-            <button onclick="window.closeAnalyticsSummary()" class="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
-                <i data-lucide="x" class="w-5 h-5"></i>
+        <div class="bg-[#0a0a0a] border border-zinc-800 p-6 md:p-8 lg:p-12 rounded-3xl lg:rounded-[2.5rem] w-full max-w-2xl lg:max-w-4xl shadow-2xl max-h-[90vh] flex flex-col relative">
+            <button onclick="window.closeAnalyticsSummary()" class="absolute top-4 right-4 lg:top-6 lg:right-6 text-zinc-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
+                <i data-lucide="x" class="w-5 h-5 lg:w-6 lg:h-6"></i>
             </button>
             
-            <h3 class="text-[10px] md:text-xs font-bold mb-2 uppercase tracking-[0.2em] text-white flex items-center gap-2">
-                <i data-lucide="bar-chart-2" class="w-4 h-4 text-zinc-400"></i>
+            <h3 class="text-[10px] md:text-xs lg:text-sm font-bold mb-2 lg:mb-3 uppercase tracking-[0.2em] text-white flex items-center gap-2 lg:gap-3">
+                <i data-lucide="bar-chart-2" class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-400"></i>
                 Detailed Audience Summary
             </h3>
-            <p class="text-zinc-500 text-[8px] md:text-[9px] mb-6 uppercase tracking-widest">สรุปจำนวนครั้งที่เข้าชมแยกตามแต่ละเครื่อง</p>
+            <p class="text-zinc-500 text-[8px] md:text-[9px] lg:text-[11px] mb-6 lg:mb-8 uppercase tracking-widest">สรุปจำนวนครั้งที่เข้าชมแยกตามแต่ละเครื่อง</p>
             
-            <div class="w-full border border-zinc-800 rounded-xl overflow-hidden bg-black/40 flex-1 overflow-y-auto custom-scrollbar">
-                <table class="w-full text-left text-[9px] md:text-[10px] text-zinc-400 border-collapse">
-                    <thead class="sticky top-0 bg-[#0f0f0f] uppercase tracking-widest text-zinc-500 text-[8px] border-b border-zinc-800 z-10 shadow-sm">
+            <div class="w-full border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden bg-black/40 flex-1 overflow-y-auto custom-scrollbar">
+                <table class="w-full text-left text-[9px] md:text-[10px] lg:text-xs text-zinc-400 border-collapse">
+                    <thead class="sticky top-0 bg-[#0f0f0f] uppercase tracking-widest text-zinc-500 text-[8px] lg:text-[10px] border-b border-zinc-800 z-10 shadow-sm">
                         <tr>
-                            <th class="py-3 px-4 font-normal text-center w-20">Visits</th>
-                            <th class="py-3 px-4 font-normal">UID (Identifier)</th>
-                            <th class="py-3 px-4 font-normal">Device</th>
-                            <th class="py-3 px-4 font-normal">Last Active</th>
+                            <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal text-center w-20 lg:w-28">Visits</th>
+                            <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal">UID (Identifier)</th>
+                            <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal">Device</th>
+                            <th class="py-3 px-4 lg:py-5 lg:px-6 font-normal">Last Active</th>
                         </tr>
                     </thead>
-                    <tbody id="analytics-summary-tbody" class="divide-y divide-zinc-900/50">
+                    <tbody id="analytics-summary-tbody" class="divide-y divide-zinc-900/50 text-[9px] md:text-[10px] lg:text-xs">
                     </tbody>
                 </table>
             </div>
             
-            <div class="mt-6 flex justify-end">
-                <button onclick="window.closeAnalyticsSummary()" class="bg-zinc-800 text-white px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] hover:bg-zinc-700 transition-all">Close</button>
+            <div class="mt-6 lg:mt-8 flex justify-end">
+                <button onclick="window.closeAnalyticsSummary()" class="bg-zinc-800 text-white px-6 py-3 lg:px-8 lg:py-4 rounded-xl lg:rounded-2xl font-bold uppercase tracking-widest text-[8px] md:text-[9px] lg:text-[11px] hover:bg-zinc-700 transition-all">Close</button>
             </div>
         </div>
     </div>
